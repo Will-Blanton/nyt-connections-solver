@@ -30,7 +30,14 @@ def retrieve_date(string):
     return date
 
 
-def create_connections_dataset():
+def create_connections_dataset(save_file):
+    """Collect all previous official NYT Connections answers to produce a dataset in csv format.
+
+    Retrieves info from: 
+    "https://tryhardguides.com/nyt-connections-answers"
+
+    Each row in the output csv ("data/connections.csv) corresponds to a category at a specific date.
+    """
     # request the connections history page
     driver = webdriver.Chrome()
 
@@ -50,12 +57,16 @@ def create_connections_dataset():
 
         for li in first_ul.children:
 
-            print(li.text)
             date = retrieve_date(li.text)
 
             for c in li.find_all('li'):
 
-                category, words = c.text.split("-", 1)
+                # category is always in the strong tag (assuming correct structure)
+                strong = c.find('strong')
+                category = strong.text.strip()
+
+                after_strong = c.text.split(strong.text, 1)[-1]
+                words = after_strong.split('-', 1)[-1]
 
                 df = pd.DataFrame({
                     'date': [date],
@@ -70,7 +81,7 @@ def create_connections_dataset():
         # reverse the order of the connections
         connections_df = connections_df[::-1].reset_index(drop=True)
 
-        connections_df.to_csv("data/connections.csv", index=True)
+        connections_df.to_csv(save_file, index=True)
 
     except Exception as e:
         print(f"An error occurred while retrieving the connections history.: {e}")
@@ -80,4 +91,4 @@ def create_connections_dataset():
 
 
 if __name__ == "__main__":
-    create_connections_dataset()
+    create_connections_dataset("data/connections.csv")
