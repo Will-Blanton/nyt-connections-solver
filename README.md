@@ -108,8 +108,9 @@ This is an early-stage, ongoing project — both practical and conceptual limita
 ## 🚧 Next Steps
 
 - Integrate **attention-based** and **set-transformer** models
-- Evaluate **precision@k**, **MRR**, and group-level accuracy metrics
 - Explore **knowledge-based** or **phonetic** signals for multi-modal reasoning
+- Evaluate **precision@k**, **MRR**, and group-level accuracy metrics
+- Tune model **hyperparameters** 
+- Explore other **architectures** (e.g., GNN-based, reinforcement learning, set building)
 - Build an interactive **demo** that shows model guesses on real puzzles
-- Explore other architectues (e.g., GNN-based, reinforcement learning, set building)
 
