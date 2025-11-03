@@ -1,0 +1,19 @@
+# Python environment
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+
+# Data, notebooks, etc.
+*.ipynb_checkpoints
+data/
+runs/
+pretrained/
+
+# direnv
+.direnv/
+.envrc
