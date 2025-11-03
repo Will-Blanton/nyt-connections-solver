@@ -93,7 +93,7 @@ This is an early-stage, ongoing project — both practical and conceptual limita
 - **Limited Dataset (~800 puzzles):**
   - Slowly grows over time (1 new puzzle per day).
 - **Featurization:**
-  - Currently uses only static semantic embeddings.
+  - Currently uses only static semantic embeddings (**This is likely the greatest limitation as of now**)
   - Future work will explore hybrid features combining:
     - Pretrained contextual embeddings (e.g., MiniLM, Instructor)
     - Structured knowledge graph features
