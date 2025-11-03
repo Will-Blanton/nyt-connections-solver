@@ -1,5 +1,5 @@
 {
-  description = "Python + CUDA Nix flake template for ML/dev environments (manual venv with Poetry)";
+  description = "Python + CUDA Nix flake template for ML/dev environments (venv with Poetry)";
 
   inputs = {
     nixpkgs.url     = "github:NixOS/nixpkgs/nixos-unstable";
@@ -34,11 +34,14 @@
           buildInputs = [
             python
             pythonPackages.venvShellHook
+            pkgs.chromium
+            pkgs.chromedriver
           ];
 
           packages = [
             pkgs.poetry
             pkgs.jupyter
+            pkgs.zlib
           ];
 
           inherit venvDir;
@@ -61,10 +64,20 @@
           postShellHook = ''
             unset SOURCE_DATE_EPOCH
             export CUDA_PATH=${cuda.cudatoolkit.lib}
-            # Host driver first, then toolkit libs, then any existing value (open gl points cuda at the global installation, since the shell doesn't fully create its own)
-	    export LD_LIBRARY_PATH="/run/opengl-driver/lib:${cuda.cudatoolkit.lib}/lib:${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}:$LD_LIBRARY_PATH"
 
-	    # may not be needed
+            # host driver first, then toolkit libs, then any existing value (open gl points cuda at the global installation, since the shell doesn't fully create its own)
+            LIB_PATHS=(
+              "/run/opengl-driver/lib"
+              "${cuda.cudatoolkit.lib}/lib"
+              "${pkgs.zlib}/lib"
+              ${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc ]}
+            )
+
+            for path in "''${LIB_PATHS[@]}"; do
+              export LD_LIBRARY_PATH="$path:$LD_LIBRARY_PATH"
+            done
+
+	          # may not be needed
             export EXTRA_LDFLAGS="-l/lib -l${nvidia_x11}/lib"
             export EXTRA_CCFLAGS="-i/usr/include"          
 
@@ -74,4 +87,3 @@
         };
       });
 }
-
