@@ -11,7 +11,7 @@
       let
         # ─── Centralized version configuration ───
         pythonVersion = "python311";       # e.g. "python312"
-        cudaVersion   = "cudaPackages_12_6"; # e.g. "cudaPackages_11_8"
+        cudaVersion   = "cudaPackages_12_8"; # e.g. "cudaPackages_11_8"
         venvDir       = ".venv";
 
         pkgs = import nixpkgs {
