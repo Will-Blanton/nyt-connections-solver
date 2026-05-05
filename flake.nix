@@ -20,7 +20,7 @@
           config.cudaSupport = true;
         };
 
-        python = pkgs.${pythonVersion + "Full"};
+        python = pkgs.${pythonVersion};
         cuda   = pkgs.${cudaVersion};
 
         pythonPackages = pkgs.${pythonVersion}.pkgs;

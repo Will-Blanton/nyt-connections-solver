@@ -1,0 +1,36 @@
+[project]
+name = "nyt-connections-solver"
+version = "0.1.0"
+description = "A machine learning agent with the goal of solving the NYT Connections game."
+authors = [
+    {name = "Will-Blanton",email = "wrblanton2017@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "torch (>=2.7.1+cu128,<3.0.0)",
+    "torchvision (>=0.22.1+cu128,<0.23.0)",
+    "torchaudio (>=2.7.1+cu128,<3.0.0)",
+    "pandas (>=2.3.0,<3.0.0)",
+    "scikit-learn (>=1.7.0,<2.0.0)",
+    "gensim (>=4.3.3,<5.0.0)",
+    "jupyter (>=1.1.1,<2.0.0)",
+    "notebook (>=7.4.4,<8.0.0)",
+    "sentence-transformers (>=5.1.1,<6.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "pytorch_cuda"
+url = "https://download.pytorch.org/whl/cu128"
+priority = "explicit"
+
+
+[tool.poetry.dependencies]
+torch = {source = "pytorch_cuda"}
+torchvision = {source = "pytorch_cuda"}
+torchaudio = {source = "pytorch_cuda"}
