@@ -43,6 +43,7 @@ def create_connections_dataset(save_file):
 
     try:
         connections = []
+        seen_dates = set()
         page = 1
 
         while True:
@@ -58,10 +59,15 @@ def create_connections_dataset(save_file):
                 break
 
             page_connections = []
+            page_new_dates = 0
 
             for li in first_ul.children:
 
                 date = retrieve_date(li.text)
+                if date is None or date in seen_dates:
+                    continue
+
+                date_connections = []
 
                 for c in li.find_all('li'):
 
@@ -80,9 +86,17 @@ def create_connections_dataset(save_file):
                         'connections': [words.strip().lower().split(", ")]
                     })
 
-                    page_connections.append(df)
+                    date_connections.append(df)
 
-            if not page_connections:
+                if date_connections:
+                    page_connections.extend(date_connections)
+                    seen_dates.add(date)
+                    page_new_dates += 1
+
+            # Stop once pagination no longer reveals any unseen puzzles. Some
+            # archive pages repeat recent dates, so a nonempty page alone does
+            # not prove that pagination is still making progress.
+            if page_new_dates == 0:
                 break
             connections.extend(page_connections)
             page += 1
