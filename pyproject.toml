@@ -1,54 +1,35 @@
-[tool.poetry]
+[project]
 name = "nyt-connections-solver"
 version = "0.1.0"
 description = "A machine learning agent for NYT Connections."
-authors = ["Will Blanton"]
+authors = [{ name = "Will Blanton" }]
 readme = "README.md"
-package-mode = false
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "gensim>=4.3.3,<5.0.0",
+    "jupyter>=1.1.1,<2.0.0",
+    "notebook>=7.4.4,<8.0.0",
+    "pandas>=2.3.0,<3.0.0a",
+    "pytorchltr==0.1.0",
+    "scikit-learn>=1.7.0,<2.0.0",
+    "selenium>=4.36.0,<5.0.0",
+    "sentence-transformers>=5.1.1,<6.0.0",
+    "tensorboardx>=2.6.4,<3.0.0",
+    "torch==2.7.1",
+    "torchaudio==2.7.1",
+    "torchvision==0.22.1",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.11,<3.13"
-pandas = ">=2.3.0,<3.0.0a"
-scikit-learn = ">=1.7.0,<2.0.0"
-gensim = ">=4.3.3,<5.0.0"
-jupyter = ">=1.1.1,<2.0.0"
-notebook = ">=7.4.4,<8.0.0"
-sentence-transformers = ">=5.1.1,<6.0.0"
+[tool.uv]
+# Match Poetry's package-mode = false: this repo is an application/notebook project.
+package = false
 
-pytorchltr = "0.1.0"
-tensorboardx = "^2.6.4"
-selenium = "^4.36.0"
-
-[build-system]
-requires = ["poetry-core>=2.0.0,<3.0.0"]
-build-backend = "poetry.core.masonry.api"
-
-# Make the default index explicit (prevents edge cases once you add custom sources)
-[[tool.poetry.source]]
-name = "pypi"
-priority = "primary"
-
-# CUDA wheels source (used only if you enable the cuda group)
-[[tool.poetry.source]]
-name = "pytorch_cuda"
+[[tool.uv.index]]
+name = "pytorch-cuda"
 url = "https://download.pytorch.org/whl/cu128"
-priority = "explicit"
+explicit = true
 
-# ---- Optional dependency groups for different machines ----
-[tool.poetry.group.cuda]
-optional = true
-
-[tool.poetry.group.cuda.dependencies]
-# Strong recommendation: pin exact versions while you stabilize the lock
-torch = { version = "2.7.1", source = "pytorch_cuda" }
-torchvision = { version = "0.22.1", source = "pytorch_cuda" }
-torchaudio = { version = "2.7.1", source = "pytorch_cuda" }
-
-# Optional example if you want a CPU-only group (kept commented unless you need it)
-# [tool.poetry.group.cpu]
-# optional = true
-#
-# [tool.poetry.group.cpu.dependencies]
-# torch = "2.7.1"
-# torchvision = "0.22.1"
-# torchaudio = "2.7.1"
+[tool.uv.sources]
+torch = { index = "pytorch-cuda" }
+torchaudio = { index = "pytorch-cuda" }
+torchvision = { index = "pytorch-cuda" }
