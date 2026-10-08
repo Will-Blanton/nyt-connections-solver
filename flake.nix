@@ -32,7 +32,12 @@
         devShells.default = pkgs.mkShell {
           name = "python-cuda-dev";
 
-          buildInputs = [ python pythonPackages.pkgs.venvShellHook ];
+          buildInputs = [
+            python
+            pythonPackages.pkgs.venvShellHook
+            pkgs.chromium
+            pkgs.chromedriver
+          ];
 
           packages = with pkgs; [ jupyter zlib ];
 
