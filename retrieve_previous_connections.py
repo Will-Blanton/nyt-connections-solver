@@ -38,43 +38,54 @@ def create_connections_dataset(save_file):
 
     Each row in the output csv ("data/connections.csv) corresponds to a category at a specific date.
     """
-    # request the connections history page
+    # request each page of the connections history
     driver = webdriver.Chrome()
 
     try:
-        # parse the HTML content to retrieve the previous connections
-        driver.get("https://tryhardguides.com/nyt-connections-answers")
-
-        # Allow time for the page to load
-        time.sleep(5)
-
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-
-        # find all <ul> elements using BeautifulSoup
-        first_ul = soup.find('div', class_='entry-content').find('ul')
-
         connections = []
+        page = 1
 
-        for li in first_ul.children:
+        while True:
+            page_url = CONNECTIONS_HISTORY_URL if page == 1 else f"{CONNECTIONS_HISTORY_URL}{page}/"
+            driver.get(page_url)
+            time.sleep(5)
 
-            date = retrieve_date(li.text)
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            entry_content = soup.find('div', class_='entry-content')
+            first_ul = entry_content.find('ul') if entry_content else None
 
-            for c in li.find_all('li'):
+            if first_ul is None:
+                break
 
-                # category is always in the strong tag (assuming correct structure)
-                strong = c.find('strong')
-                category = strong.text.strip()
+            page_connections = []
 
-                after_strong = c.text.split(strong.text, 1)[-1]
-                words = after_strong.split('-', 1)[-1]
+            for li in first_ul.children:
 
-                df = pd.DataFrame({
-                    'date': [date],
-                    'category': [category.strip().lower()],
-                    'connections': [words.strip().lower().split(", ")]
-                })
+                date = retrieve_date(li.text)
 
-                connections.append(df)
+                for c in li.find_all('li'):
+
+                    # category is always in the strong tag (assuming correct structure)
+                    strong = c.find('strong')
+                    if strong is None:
+                        continue
+                    category = strong.text.strip()
+
+                    after_strong = c.text.split(strong.text, 1)[-1]
+                    words = after_strong.split('-', 1)[-1]
+
+                    df = pd.DataFrame({
+                        'date': [date],
+                        'category': [category.strip().lower()],
+                        'connections': [words.strip().lower().split(", ")]
+                    })
+
+                    page_connections.append(df)
+
+            if not page_connections:
+                break
+            connections.extend(page_connections)
+            page += 1
 
         connections_df = pd.concat(connections)
 
