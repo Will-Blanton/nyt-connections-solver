@@ -3,6 +3,7 @@
 venv/
 __pycache__/
 *.pyc
+*.egg-info
 
 # IDE
 .idea/
@@ -13,6 +14,7 @@ __pycache__/
 data/
 runs/
 pretrained/
+weights/
 
 # direnv
 .direnv/
