@@ -9,6 +9,7 @@ import torch
 from sentence_transformers import SentenceTransformer
 
 from .models import AttentionModel, Baseline, SetTransformer
+from .wordnet import WordNetFeatureEncoder
 
 
 MODEL_TYPES = {
@@ -16,6 +17,16 @@ MODEL_TYPES = {
     "AttentionModel": AttentionModel,
     "SetTransformer": SetTransformer,
 }
+
+
+def _resolve_device(device: str | torch.device) -> torch.device:
+    if str(device) == "auto":
+        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    resolved = torch.device(device)
+    if resolved.type == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError("CUDA was requested, but no CUDA device is available")
+    return resolved
+
 
 @dataclass(frozen=True)
 class SearchPath:
@@ -50,7 +61,7 @@ class SearchHarness:
         weights_path: str | Path,
         *,
         beam_width: int = 10,
-        device: str | torch.device = "cpu",
+        device: str | torch.device = "auto",
         state_batch_size: int = 4,
     ) -> None:
         if beam_width < 1:
@@ -60,7 +71,7 @@ class SearchHarness:
         self.weights_path = Path(weights_path)
         self.beam_width = beam_width
         self.state_batch_size = state_batch_size
-        self.device = torch.device(device)
+        self.device = _resolve_device(device)
 
         if not self.weights_path.is_file():
             raise FileNotFoundError(f"Checkpoint not found: {self.weights_path}")
@@ -99,6 +110,13 @@ class SearchHarness:
             embedding_model_name,
             device=str(self.device),
         )
+        self.word_embedder.requires_grad_(False)
+        self.word_embedder.eval()
+        self.wordnet_encoder = (
+            WordNetFeatureEncoder(self.word_embedder)
+            if model_config.get("wordnet_dim") is not None
+            else None
+        )
 
     @classmethod
     def from_model(
@@ -108,8 +126,9 @@ class SearchHarness:
         *,
         input_dim: int,
         beam_width: int = 10,
-        device: str | torch.device = "cpu",
+        device: str | torch.device = "auto",
         state_batch_size: int = 4,
+        wordnet_encoder: WordNetFeatureEncoder | None = None,
     ) -> "SearchHarness":
         """Build a harness around in-memory objects, useful for model selection."""
         if beam_width < 1:
@@ -121,7 +140,7 @@ class SearchHarness:
         harness.weights_path = Path("<in-memory>")
         harness.beam_width = beam_width
         harness.state_batch_size = state_batch_size
-        harness.device = torch.device(device)
+        harness.device = _resolve_device(device)
         harness.checkpoint = {}
         harness.model = model.to(harness.device).eval()
         harness.input_dim = input_dim
@@ -133,7 +152,9 @@ class SearchHarness:
             )
             for count in (16, 12, 8)
         }
-        harness.word_embedder = word_embedder
+        harness.word_embedder = word_embedder.to(harness.device).eval()
+        harness.word_embedder.requires_grad_(False)
+        harness.wordnet_encoder = wordnet_encoder
         return harness
 
     def solve(self, words: Sequence[str]) -> SearchResult:
@@ -147,7 +168,14 @@ class SearchHarness:
         with torch.inference_mode():
             embeddings = self.word_embedder.encode(
                 list(words), convert_to_tensor=True, show_progress_bar=False
-            ).to(self.device)  # (16, D)
+            ).to(device=self.device, dtype=torch.float32)  # (16, D)
+            if self.wordnet_encoder is not None:
+                wordnet = torch.as_tensor(
+                    self.wordnet_encoder.encode(words),
+                    device=self.device,
+                    dtype=torch.float32,
+                )  # (16, D_wordnet)
+                embeddings = torch.cat([embeddings, wordnet], dim=-1)
             if embeddings.shape != (16, self.input_dim):
                 raise ValueError(
                     f"Checkpoint expects {self.input_dim} features per word, but "

@@ -186,6 +186,28 @@ class MLPScorer(nn.Module):
         return self.mlp(x)
 
 
+class SemanticWordNetMixer(nn.Module):
+    """Project semantic and WordNet vectors separately, then learn a gated mix."""
+
+    def __init__(self, semantic_dim: int, wordnet_dim: int, out_dim: int):
+        super().__init__()
+        self.semantic_dim = semantic_dim
+        self.wordnet_dim = wordnet_dim
+        self.semantic_proj = nn.Linear(semantic_dim, out_dim)
+        self.wordnet_proj = nn.Linear(wordnet_dim, out_dim)
+        self.gate = nn.Linear(out_dim * 2, out_dim)
+        self.norm = nn.LayerNorm(out_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        semantic, wordnet = torch.split(
+            x, [self.semantic_dim, self.wordnet_dim], dim=-1
+        )
+        semantic = torch.relu(self.semantic_proj(semantic))
+        wordnet = torch.relu(self.wordnet_proj(wordnet))
+        gate = torch.sigmoid(self.gate(torch.cat([semantic, wordnet], dim=-1)))
+        return self.norm(semantic + gate * wordnet)
+
+
 class Grouper(nn.Module):
     def __init__(self, group_idx: torch.Tensor):
         super().__init__()
@@ -207,12 +229,12 @@ class Grouper(nn.Module):
 
 # start with a simple model and build our way up
 class Baseline(nn.Module):
-    def __init__(self, in_dim, group_idx, layers: Sequence[int] = DEFAULT_BASE_SCORER_LAYERS):
+    def __init__(self, in_dim, group_idx, layers: Sequence[int] = DEFAULT_BASE_SCORER_LAYERS,
+                 semantic_dim=None, wordnet_dim=None):
         super().__init__()
 
-        self.proj = nn.Sequential(
-            nn.Linear(in_dim, BASE_PROJECTION_DIM),
-            nn.ReLU()
+        self.proj = self._make_input_projection(
+            in_dim, BASE_PROJECTION_DIM, semantic_dim, wordnet_dim
         )
 
         self.grouper = Grouper(group_idx)
@@ -221,6 +243,14 @@ class Baseline(nn.Module):
             hidden_dims=layers,
             dropout=SCORER_DROPOUT,
         )
+
+    @staticmethod
+    def _make_input_projection(in_dim, out_dim, semantic_dim, wordnet_dim):
+        if semantic_dim is None and wordnet_dim is None:
+            return nn.Sequential(nn.Linear(in_dim, out_dim), nn.ReLU())
+        if semantic_dim is None or wordnet_dim is None or semantic_dim + wordnet_dim != in_dim:
+            raise ValueError("semantic_dim + wordnet_dim must equal in_dim")
+        return SemanticWordNetMixer(semantic_dim, wordnet_dim, out_dim)
 
     def forward(self, x, group_idx=None):
 
@@ -241,12 +271,13 @@ class AttentionModel(nn.Module):
         group_idx,
         layers: Sequence[int] = DEFAULT_BASE_SCORER_LAYERS,
         attn_layers=DEFAULT_ATTENTION_LAYERS,
+        semantic_dim=None,
+        wordnet_dim=None,
     ):
         super().__init__()
 
-        self.proj = nn.Sequential(
-            nn.Linear(in_dim, BASE_PROJECTION_DIM),
-            nn.ReLU()
+        self.proj = Baseline._make_input_projection(
+            in_dim, BASE_PROJECTION_DIM, semantic_dim, wordnet_dim
         )
 
         self.grouper = Grouper(group_idx)
@@ -285,15 +316,19 @@ class SetTransformer(torch.nn.Module):
             attn_width=DEFAULT_SET_ATTN_WIDTH,
             attn_heads=DEFAULT_SET_ATTN_HEADS,
             dropout=SCORER_DROPOUT,
+            semantic_dim=None,
+            wordnet_dim=None,
         ):
         super().__init__()
 
-        self.input_norm = nn.LayerNorm(in_dim)
-
-        self.proj = nn.Sequential(
-            nn.Linear(in_dim, attn_width),
-            nn.ReLU()
-        )
+        if semantic_dim is None and wordnet_dim is None:
+            self.input_norm = nn.LayerNorm(in_dim)
+            self.proj = nn.Sequential(nn.Linear(in_dim, attn_width), nn.ReLU())
+        else:
+            if semantic_dim is None or wordnet_dim is None or semantic_dim + wordnet_dim != in_dim:
+                raise ValueError("semantic_dim + wordnet_dim must equal in_dim")
+            self.input_norm = nn.Identity()
+            self.proj = SemanticWordNetMixer(semantic_dim, wordnet_dim, attn_width)
 
         self.full_encoder = SetEncoder(
             attn_width,

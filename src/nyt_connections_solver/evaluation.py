@@ -122,7 +122,7 @@ def evaluate_oracle_next_group_ranking(
     for puzzle in puzzles:
         embeddings = harness.word_embedder.encode(
             list(puzzle.words), convert_to_tensor=True, show_progress_bar=False
-        ).to(device)
+        ).to(device=device, dtype=torch.float32)
         if embeddings.shape != (16, harness.input_dim):
             raise ValueError(
                 f"Checkpoint expects {harness.input_dim} features per word, but "
@@ -195,10 +195,14 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--dataset", type=Path, help="Override the dataset path saved in the checkpoint")
     parser.add_argument("--split", choices=("train", "val", "test"), default="val")
     parser.add_argument("--beam-width", type=int, default=10)
-    parser.add_argument("--device", default="cpu")
+    parser.add_argument(
+        "--device", default="auto",
+        help="Inference device: auto (CUDA when available), cpu, or a CUDA device such as cuda:0",
+    )
     args = parser.parse_args(argv)
 
     harness = SearchHarness(args.weights, beam_width=args.beam_width, device=args.device)
+    print(f"Using device: {harness.device}")
     checkpoint = harness.checkpoint
     if not isinstance(checkpoint, dict) or "split_dates" not in checkpoint:
         parser.error("Checkpoint must contain split_dates from the notebook")
