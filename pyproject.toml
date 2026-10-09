@@ -9,6 +9,7 @@ dependencies = [
     "gensim>=4.3.3,<5.0.0",
     "jupyter>=1.1.1,<2.0.0",
     "notebook>=7.4.4,<8.0.0",
+    "optuna>=5.0.0",
     "pandas>=2.3.0,<3.0.0a",
     "pytorchltr==0.1.0",
     "scikit-learn>=1.7.0,<2.0.0",
@@ -21,7 +22,7 @@ dependencies = [
 ]
 
 [tool.uv]
-# Match Poetry's package-mode = false: this repo is an application/notebook project.
+# This is an application/notebook project; src is added to sys.path by the notebook.
 package = false
 
 [[tool.uv.index]]
