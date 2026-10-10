@@ -113,7 +113,11 @@ class SearchHarness:
         self.word_embedder.requires_grad_(False)
         self.word_embedder.eval()
         self.wordnet_encoder = (
-            WordNetFeatureEncoder(self.word_embedder)
+            WordNetFeatureEncoder(
+                self.word_embedder,
+                max_senses=self.checkpoint.get("wordnet_max_senses", 8),
+                puzzle_conditioned=self.checkpoint.get("wordnet_puzzle_conditioned", False),
+            )
             if model_config.get("wordnet_dim") is not None
             else None
         )
