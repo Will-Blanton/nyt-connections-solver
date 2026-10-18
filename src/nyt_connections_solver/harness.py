@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 import torch
 from sentence_transformers import SentenceTransformer
@@ -133,8 +133,15 @@ class SearchHarness:
         device: str | torch.device = "auto",
         state_batch_size: int = 4,
         wordnet_encoder: WordNetFeatureEncoder | None = None,
+        edge_feature_builder: Callable | None = None,
+        node_feature_builder=None,
     ) -> "SearchHarness":
-        """Build a harness around in-memory objects, useful for model selection."""
+        """Build a harness around in-memory objects, useful for model selection.
+
+        An optional edge builder takes (full_puzzle_words, node_features) and
+        returns (16, 16, edge_dim). Both node axes are sliced during search.
+        A node_feature_builder replaces the default text/WordNet concatenation.
+        """
         if beam_width < 1:
             raise ValueError("beam_width must be positive")
         if state_batch_size < 1:
@@ -159,6 +166,8 @@ class SearchHarness:
         harness.word_embedder = word_embedder.to(harness.device).eval()
         harness.word_embedder.requires_grad_(False)
         harness.wordnet_encoder = wordnet_encoder
+        harness.edge_feature_builder = edge_feature_builder
+        harness.node_feature_builder = node_feature_builder
         return harness
 
     def solve(self, words: Sequence[str]) -> SearchResult:
@@ -170,10 +179,15 @@ class SearchHarness:
             raise ValueError("Puzzle words must be distinct")
 
         with torch.inference_mode():
-            embeddings = self.word_embedder.encode(
-                list(words), convert_to_tensor=True, show_progress_bar=False
-            ).to(device=self.device, dtype=torch.float32)  # (16, D)
-            if self.wordnet_encoder is not None:
+            node_builder = getattr(self, "node_feature_builder", None)
+            if node_builder is None:
+                embeddings = self.word_embedder.encode(
+                    list(words), convert_to_tensor=True, show_progress_bar=False
+                )
+            else:
+                embeddings = node_builder.encode(words, convert_to_tensor=True)
+            embeddings = torch.as_tensor(embeddings).to(device=self.device, dtype=torch.float32)
+            if node_builder is None and self.wordnet_encoder is not None:
                 wordnet = torch.as_tensor(
                     self.wordnet_encoder.encode(words),
                     device=self.device,
@@ -183,9 +197,19 @@ class SearchHarness:
             if embeddings.shape != (16, self.input_dim):
                 raise ValueError(
                     f"Checkpoint expects {self.input_dim} features per word, but "
-                    f"the embedder returned {tuple(embeddings.shape)}; checkpoints "
-                    "with additional features are not yet supported"
+                    f"the node encoder returned {tuple(embeddings.shape)}"
                 )
+
+            edge_builder = getattr(self, "edge_feature_builder", None)
+            edges = None
+            if edge_builder is not None:
+                edges = torch.as_tensor(
+                    edge_builder(words, embeddings), device=self.device, dtype=torch.float32
+                )  # (16, 16, E)
+                if edges.ndim != 3 or edges.shape[:2] != (16, 16):
+                    raise ValueError("Edge builder must return (16, 16, edge_dim)")
+                if not torch.isfinite(edges).all():
+                    raise ValueError("Edge features must be finite")
 
             remaining = torch.arange(16, device=self.device).unsqueeze(0)  # (1, 16)
             beam_scores = torch.zeros(1, device=self.device)  # (1,)
@@ -198,8 +222,14 @@ class SearchHarness:
                 for start in range(0, len(remaining), self.state_batch_size):
                     end = start + self.state_batch_size
                     state_embeddings = embeddings[remaining[start:end]]  # (B, count, D)
+                    model_kwargs = {}
+                    if edges is not None:
+                        positions = remaining[start:end]  # (B, count)
+                        model_kwargs["edge_features"] = edges[
+                            positions[:, :, None], positions[:, None, :]
+                        ]  # (B, count, count, E)
                     logits = self.model(
-                        state_embeddings, group_idx=candidates
+                        state_embeddings, group_idx=candidates, **model_kwargs
                     ).squeeze(-1)  # (B, C)
                     log_probs = torch.log_softmax(logits.float(), dim=1)  # (B, C)
                     score_batches.append(
