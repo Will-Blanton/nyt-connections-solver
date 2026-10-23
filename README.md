@@ -2,6 +2,16 @@
 
 This project reframes the *NYT Connections* puzzle as a **machine learning problem**, where the goal is to automatically identify the four semantically related words within each daily puzzle set.
 
+Inspect saved text/spelling graph models with the Streamlit diagnostic app:
+
+```bash
+nix develop -c uv run streamlit run scripts/diagnose.py
+```
+
+Select a checkpoint and puzzle, step through feedback-aware search, or run a batch
+and replay its rankings, predicted groups, word projections, and ground truth.
+See [the diagnostic app guide](notes/model-diagnostics.md) for details.
+
 ---
 
 ## 🧠 What Is *Connections*?

@@ -20,6 +20,8 @@ dependencies = [
     "torch==2.7.1",
     "torchaudio==2.7.1",
     "torchvision==0.22.1",
+    "streamlit>=1.50,<2",
+    "altair>=5,<7",
 ]
 
 [tool.uv]
