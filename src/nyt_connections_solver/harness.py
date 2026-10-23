@@ -126,7 +126,7 @@ class SearchHarness:
     def from_model(
         cls,
         model: torch.nn.Module,
-        word_embedder: SentenceTransformer,
+        word_embedder: SentenceTransformer | None,
         *,
         input_dim: int,
         beam_width: int = 10,
@@ -163,21 +163,21 @@ class SearchHarness:
             )
             for count in (16, 12, 8)
         }
-        harness.word_embedder = word_embedder.to(harness.device).eval()
-        harness.word_embedder.requires_grad_(False)
+        if word_embedder is None and node_feature_builder is None:
+            raise ValueError("Supply a word_embedder or node_feature_builder")
+        harness.word_embedder = None if word_embedder is None else word_embedder.to(harness.device).eval()
+        if harness.word_embedder is not None:
+            harness.word_embedder.requires_grad_(False)
         harness.wordnet_encoder = wordnet_encoder
         harness.edge_feature_builder = edge_feature_builder
         harness.node_feature_builder = node_feature_builder
         return harness
 
-    def solve(self, words: Sequence[str]) -> SearchResult:
-        """Return the highest-scoring complete partition and each retained beam."""
+    def encode_puzzle(self, words: Sequence[str]):
+        """Encode a board once; callers slice these features for residual states."""
         words = tuple(words)
-        if len(words) != 16 or any(not isinstance(word, str) for word in words):
-            raise ValueError("Expected exactly 16 words")
-        if len(set(words)) != 16:
-            raise ValueError("Puzzle words must be distinct")
-
+        if len(words) != 16 or len(set(words)) != 16:
+            raise ValueError("Expected 16 distinct words")
         with torch.inference_mode():
             node_builder = getattr(self, "node_feature_builder", None)
             if node_builder is None:
@@ -210,6 +210,19 @@ class SearchHarness:
                     raise ValueError("Edge builder must return (16, 16, edge_dim)")
                 if not torch.isfinite(edges).all():
                     raise ValueError("Edge features must be finite")
+
+            return embeddings, edges
+
+    def solve(self, words: Sequence[str]) -> SearchResult:
+        """Return the highest-scoring complete partition and each retained beam."""
+        words = tuple(words)
+        if len(words) != 16 or any(not isinstance(word, str) for word in words):
+            raise ValueError("Expected exactly 16 words")
+        if len(set(words)) != 16:
+            raise ValueError("Puzzle words must be distinct")
+
+        with torch.inference_mode():
+            embeddings, edges = self.encode_puzzle(words)
 
             remaining = torch.arange(16, device=self.device).unsqueeze(0)  # (1, 16)
             beam_scores = torch.zeros(1, device=self.device)  # (1,)
