@@ -109,19 +109,264 @@ class GraphSetTransformer(SetTransformer):
         )
         self.subset_decoder.load_state_dict(original.state_dict(), strict=False)
 
-    def forward(self, x, group_idx=None, edge_features=None):
+    def encode_candidate_words(self, x, group_idx=None, edge_features=None, *, return_stages=False):
         B, N, _ = x.shape
         if edge_features is None or edge_features.shape != (B, N, N, self.edge_dim):
             raise ValueError("Expected edge_features with shape (B, N, N, edge_dim)")
         x = self.proj(self.input_norm(x))  # (B, N, D)
+        projected = x if return_stages else None
         x = self.full_encoder(x, edge_features)  # (B, N, D)
         idx = self.grouper.idx if group_idx is None else group_idx.to(x.device)
         x = self.grouper(x, group_idx=idx)  # (B, C, 4, D)
+        global_words = x if return_stages else None
         B, C, group_size, D = x.shape
         # Select the same four indices on both edge axes for every candidate.
         candidate_edges = edge_features[:, idx[:, :, None], idx[:, None, :], :]
         candidate_edges = candidate_edges.reshape(B * C, group_size, group_size, self.edge_dim)
         x = x.reshape(B * C, group_size, D)
         x = self.subset_encoder(x, candidate_edges)  # (B * C, 4, D)
+        words = x.reshape(B, C, group_size, D)
+        edges = candidate_edges.reshape(B, C, group_size, group_size, self.edge_dim)
+        if return_stages:
+            return words, edges, {"projected": self.grouper(projected, group_idx=idx),
+                                  "global": global_words, "candidate": words}
+        return words, edges
+
+    def encode_candidates(self, x, group_idx=None, edge_features=None):
+        words, edges = self.encode_candidate_words(x, group_idx, edge_features)
+        B, C, group_size, D = words.shape
+        x = words.reshape(B * C, group_size, D)
+        candidate_edges = edges.reshape(B * C, group_size, group_size, self.edge_dim)
         x = self.subset_decoder(x, candidate_edges).squeeze(1)  # (B * C, D)
-        return self.scorer(x.reshape(B, C, D))  # (B, C, 1)
+        return x.reshape(B, C, D)
+
+    def forward(self, x, group_idx=None, edge_features=None):
+        return self.scorer(self.encode_candidates(x, group_idx, edge_features))
+
+    def diagnostic_representations(self, nodes, edges):
+        """Optional per-word views used by diagnostics, independent of scoring."""
+        projected = self.proj(self.input_norm(nodes[None]))
+        return {"Learned input projection": projected[0],
+                "Learned graph encoder": self.full_encoder(projected, edges[None])[0]}
+
+
+class GatedEdgeResidual(GraphSetTransformer):
+    """Frozen semantic scorer plus a candidate-local, gated edge correction.
+
+    Six unordered pairs are encoded with a shared MLP and mean/max pooled.
+    No edge message changes the pretrained semantic representations.
+    """
+
+    def __init__(self, *, edge_hidden=32, residual_edge_channels=None, **config):
+        if config.get("edge_bias_scale", 0) != 0:
+            raise ValueError("The residual experiment requires a text-only base")
+        super().__init__(**config)
+        for parameter in self.parameters():
+            parameter.requires_grad_(False)
+        mask = torch.ones(self.edge_dim)
+        if residual_edge_channels is not None:
+            if any(i < 0 or i >= self.edge_dim for i in residual_edge_channels):
+                raise ValueError("Residual edge channels must be valid indices")
+            mask.zero_()
+            mask[list(residual_edge_channels)] = 1
+        self.register_buffer("residual_edge_mask", mask, persistent=False)
+        width = config.get("attn_width", 512)
+        self.edge_encoder = nn.Sequential(
+            nn.Linear(self.edge_dim, edge_hidden), nn.ReLU(),
+            nn.Linear(edge_hidden, edge_hidden), nn.ReLU(),
+        )
+        self.edge_correction = nn.Linear(width + edge_hidden * 2, 1)
+        self.edge_gate = nn.Linear(width + edge_hidden * 2, 1)
+        nn.init.zeros_(self.edge_correction.weight)
+        nn.init.zeros_(self.edge_correction.bias)
+
+    def forward(self, x, group_idx=None, edge_features=None):
+        with torch.no_grad():
+            representation = self.encode_candidates(x, group_idx, edge_features)
+            base_score = self.scorer(representation)
+        idx = self.grouper.idx if group_idx is None else group_idx.to(x.device)
+        pairs = torch.triu_indices(4, 4, offset=1, device=x.device)
+        pair_edges = edge_features[:, idx[:, pairs[0]], idx[:, pairs[1]], :]
+        encoded = self.edge_encoder(pair_edges * self.residual_edge_mask)
+        pooled = torch.cat([encoded.mean(dim=2), encoded.amax(dim=2)], dim=-1)
+        combined = torch.cat([representation, pooled], dim=-1)
+        return base_score + self.edge_gate(combined).sigmoid() * self.edge_correction(combined)
+
+    def train(self, mode=True):
+        super().train(mode)
+        for module in (self.input_norm, self.proj, self.full_encoder,
+                       self.subset_encoder, self.subset_decoder, self.scorer):
+            module.eval()
+        return self
+
+
+class CandidateGINE(nn.Module):
+    """Dense GINE on four-word candidates, without diagonal/self messages.
+
+    h'_i = MLP((1 + eps) h_i + sum_{j != i} ReLU(h_j + W_e e_ij)).
+    Each layer has its own edge projection, MLP, and trainable scalar epsilon.
+    """
+
+    def __init__(self, node_dim, edge_dim, hidden=32, layers=2, nonlinear_edges=False, dropout=0.):
+        super().__init__()
+        self.node_projection = nn.Linear(node_dim, hidden)
+        self.edge_projections = nn.ModuleList([
+            nn.Linear(edge_dim, hidden, bias=False) for _ in range(layers)
+        ])
+        self.updates = nn.ModuleList([
+            nn.Sequential(nn.Linear(hidden, hidden), nn.ReLU(),
+                          nn.Linear(hidden, hidden), nn.ReLU()) for _ in range(layers)
+        ])
+        if dropout:
+            self.updates = nn.ModuleList([
+                nn.Sequential(update[0], update[1], nn.Dropout(dropout),
+                              update[2], update[3], nn.Dropout(dropout))
+                for update in self.updates
+            ])
+        self.eps = nn.Parameter(torch.zeros(layers))
+        if nonlinear_edges:
+            # Construct extra weights last to preserve all other initializations
+            # relative to the linear-edge variant under a matched seed.
+            self.edge_projections = nn.ModuleList([
+                nn.Sequential(projection, nn.ReLU(), nn.Linear(hidden, hidden, bias=False))
+                for projection in self.edge_projections
+            ])
+
+    def forward(self, words, edges):
+        h = self.node_projection(words)
+        diagonal = torch.eye(h.shape[-2], device=h.device, dtype=torch.bool)
+        for layer, (edge_projection, update) in enumerate(zip(self.edge_projections, self.updates)):
+            # Axes: (..., receiving word i, sending word j, hidden).
+            messages = torch.relu(h.unsqueeze(-3) + edge_projection(edges))
+            messages = messages.masked_fill(diagonal[..., None], 0)
+            h = update((1 + self.eps[layer]) * h + messages.sum(dim=-2))
+        return torch.cat([h.mean(dim=-2), h.amax(dim=-2)], dim=-1)
+
+
+class GatedGINEResidual(GatedEdgeResidual):
+    """A frozen semantic scorer corrected by a gated candidate-local GINE."""
+
+    def __init__(self, *, edge_hidden=32, gine_layers=2, nonlinear_edges=False,
+                 gine_input_stage="candidate", gine_dropout=0., **config):
+        if gine_input_stage not in {"projected", "global", "candidate"}:
+            raise ValueError("Unknown GINE input stage")
+        super().__init__(edge_hidden=edge_hidden, **config)
+        self.gine_input_stage = gine_input_stage
+        width = config.get("attn_width", 512)
+        self.edge_encoder = CandidateGINE(width, self.edge_dim, edge_hidden, gine_layers, nonlinear_edges, gine_dropout)
+
+    def forward(self, x, group_idx=None, edge_features=None):
+        with torch.no_grad():
+            if self.gine_input_stage == "candidate":
+                words, edges = self.encode_candidate_words(x, group_idx, edge_features)
+                branch_words = words
+            else:
+                words, edges, stages = self.encode_candidate_words(
+                    x, group_idx, edge_features, return_stages=True)
+                branch_words = stages[self.gine_input_stage]
+            B, C, N, D = words.shape
+            representation = self.subset_decoder(
+                words.reshape(B * C, N, D), edges.reshape(B * C, N, N, self.edge_dim)
+            ).reshape(B, C, D)
+            base_score = self.scorer(representation)
+        pooled = self.edge_encoder(branch_words, edges * self.residual_edge_mask)
+        combined = torch.cat([representation, pooled], dim=-1)
+        return base_score + self.edge_gate(combined).sigmoid() * self.edge_correction(combined)
+
+
+class StandaloneCandidateGINE(GatedGINEResidual):
+    """Score each four-word candidate with GINE alone, without attention scores."""
+
+    def __init__(self, *, edge_hidden=32, gine_layers=2, train_text_projection=False,
+                 train_input_norm=False, raw_text_embeddings=False,
+                 projection_width=None, adapter_hidden=None, single_layer_adapter=False,
+                 gine_dropout=0., readout_width=128, **config):
+        if single_layer_adapter:
+            if adapter_hidden is not None:
+                raise ValueError("Choose either a single-layer adapter or a bottleneck adapter")
+            adapter_hidden = config["in_dim"]
+        super().__init__(edge_hidden=edge_hidden, gine_layers=gine_layers,
+                         gine_input_stage="projected", gine_dropout=gine_dropout, **config)
+        if projection_width is not None:
+            if projection_width < 1 or raw_text_embeddings:
+                raise ValueError("projection_width must be positive and requires projected embeddings")
+            self.proj = nn.Sequential(nn.Linear(config["in_dim"], projection_width), nn.ReLU())
+            self.edge_encoder = CandidateGINE(projection_width, self.edge_dim,
+                                              edge_hidden, gine_layers, dropout=gine_dropout)
+        self.train_text_projection = train_text_projection
+        self.train_input_norm = train_input_norm
+        self.raw_text_embeddings = raw_text_embeddings
+        self.adapter_hidden = adapter_hidden
+        if adapter_hidden is not None:
+            if adapter_hidden < 0 or projection_width is not None or raw_text_embeddings:
+                raise ValueError("Adapters require a nonnegative bottleneck and unprojected embeddings")
+            self.input_norm.requires_grad_(True)
+            self.train_input_norm = True
+            self.edge_encoder = CandidateGINE(config["in_dim"], self.edge_dim,
+                                              edge_hidden, gine_layers, dropout=gine_dropout)
+        if train_text_projection:
+            self.proj.requires_grad_(True)
+        if train_input_norm:
+            self.input_norm.requires_grad_(True)
+        if raw_text_embeddings:
+            self.edge_encoder = CandidateGINE(config["in_dim"], self.edge_dim,
+                                              edge_hidden, gine_layers, dropout=gine_dropout)
+        self.edge_gate.requires_grad_(False)
+        self.edge_correction.requires_grad_(False)
+        self.group_readout = nn.Sequential(
+            nn.Linear(edge_hidden * 2, readout_width), nn.ReLU(), nn.Linear(readout_width, 1)
+        )
+        if gine_dropout:
+            self.group_readout = nn.Sequential(self.group_readout[0], self.group_readout[1],
+                                               nn.Dropout(gine_dropout), self.group_readout[2])
+        if adapter_hidden:
+            # Construct last so matched seeds retain identical initial GINE/readout tensors.
+            if single_layer_adapter:
+                self.embedding_adapter = nn.Sequential(
+                    nn.Linear(config["in_dim"], config["in_dim"]), nn.ReLU(),
+                )
+            else:
+                self.embedding_adapter = nn.Sequential(
+                    nn.Linear(config["in_dim"], adapter_hidden), nn.ReLU(),
+                    nn.Linear(adapter_hidden, config["in_dim"]),
+                )
+                nn.init.zeros_(self.embedding_adapter[-1].weight)
+                nn.init.zeros_(self.embedding_adapter[-1].bias)
+
+    def forward(self, x, group_idx=None, edge_features=None):
+        B, N, _ = x.shape
+        if edge_features is None or edge_features.shape != (B, N, N, self.edge_dim):
+            raise ValueError("Expected complete pairwise edge features")
+        idx = self.grouper.idx if group_idx is None else group_idx.to(x.device)
+        edges = edge_features[:, idx[:, :, None], idx[:, None, :], :]
+        words = self.encode_input_words(x)
+        candidates = self.grouper(words, group_idx=idx)
+        B, C, _, D = candidates.shape
+        pooled = self.edge_encoder(candidates.reshape(B * C, 4, D),
+                                   (edges * self.residual_edge_mask).reshape(B * C, 4, 4, self.edge_dim))
+        return self.group_readout(pooled).reshape(B, C, 1)
+
+    def encode_input_words(self, x):
+        """Representations actually supplied to candidate-local GINE."""
+        if self.adapter_hidden is not None:
+            words = self.input_norm(x)
+            if self.adapter_hidden:
+                words = words + self.embedding_adapter(words)
+        elif self.raw_text_embeddings:
+            words = torch.nn.functional.layer_norm(x, (x.shape[-1],))
+        else:
+            words = self.proj(self.input_norm(x))
+        return words
+
+    def diagnostic_representations(self, nodes, edges):
+        # Candidate GINE vectors depend on the other three words. There is no
+        # single global GINE vector per word, so do not display inherited attention.
+        return {"GINE input words": self.encode_input_words(nodes[None])[0]}
+
+    def train(self, mode=True):
+        super().train(mode)
+        if self.train_text_projection:
+            self.proj.train(mode)
+        if self.train_input_norm:
+            self.input_norm.train(mode)
+        return self

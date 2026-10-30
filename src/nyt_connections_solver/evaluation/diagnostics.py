@@ -89,16 +89,19 @@ class DiagnosticRecord:
     beam_width: int = 20
     max_mistakes: int = 4
     shuffle_seed: int = 0
+    score_mode: str = "full_board"
 
 
 class DiagnosticSession:
     """Interactive session or batch runner around the production play policy."""
 
-    def __init__(self, harness, puzzle, *, beam_width=20, max_mistakes=4, seed=0):
+    def __init__(self, harness, puzzle, *, beam_width=20, max_mistakes=4, seed=0,
+                 score_mode="full_board"):
         words = list(puzzle.words)
         random.Random(f"{seed}:{puzzle.date}").shuffle(words)
         self.environment = LocalConnectionsEnvironment(words, tuple(puzzle.groups), max_mistakes=max_mistakes)
-        self.policy = FeedbackSearchHarness.from_harness(harness, beam_width=beam_width, capture_trace=True)
+        self.policy = FeedbackSearchHarness.from_harness(
+            harness, beam_width=beam_width, capture_trace=True, score_mode=score_mode)
         self.puzzle = puzzle
         self.max_mistakes = max_mistakes
         self.shuffle_seed = seed
@@ -120,19 +123,28 @@ class DiagnosticSession:
         self.feature_seconds = perf_counter() - start
         nodes = self.policy.scorer.nodes
         edges = self.policy.scorer.edges
-        node_builder = harness.node_feature_builder
-        semantic_dim = node_builder.embeddings.dim
-        representations = {"Text embeddings": nodes[:, :semantic_dim]}
+        node_builder = getattr(harness, "node_feature_builder", None)
+        embeddings = getattr(node_builder, "embeddings", None)
+        semantic_dim = getattr(embeddings, "dim", None)
+        representations = ({"Text embeddings": nodes[:, :semantic_dim]} if semantic_dim
+                           else {"Node features": nodes})
+        representation_hook = getattr(harness.model, "diagnostic_representations", None)
         with torch.inference_mode():
-            encoded = harness.model.proj(harness.model.input_norm(nodes[None]))
-            encoded = harness.model.full_encoder(encoded, edges[None])[0]
-        representations["Learned graph encoder"] = encoded
+            if representation_hook is not None:
+                representations.update(representation_hook(nodes, edges))
+        for name, tensor in representations.items():
+            if tensor.ndim != 2 or tensor.shape[0] != len(words) or not torch.isfinite(tensor).all():
+                raise ValueError(f"Invalid per-word diagnostic representation: {name}")
         self.projections = {
             name: project_words(tensor.detach().cpu().numpy())
             for name, tensor in representations.items()
         }
-        self.edges = edges.detach().cpu().numpy()
-        self.edge_names = tuple(harness.checkpoint["edge_feature_names"])
+        self.edges = (edges.detach().cpu().numpy() if edges is not None
+                      else np.empty((len(words), len(words), 0)))
+        names = harness.checkpoint.get("edge_feature_names", ()) if edges is not None else ()
+        self.edge_names = tuple(names) or tuple(f"Edge {i + 1}" for i in range(self.edges.shape[-1]))
+        if len(self.edge_names) != self.edges.shape[-1]:
+            raise ValueError("Edge feature names do not match diagnostic channels")
 
     def analyze(self):
         if self.pending is not None:
@@ -174,7 +186,7 @@ class DiagnosticSession:
             self.decisions + ([self.pending] if self.pending else []),
             state, self.projections, self.edges, self.edge_names, self.feature_seconds,
             self.gold_group_labels,
-            self.policy.beam_width, self.max_mistakes, self.shuffle_seed,
+            self.policy.beam_width, self.max_mistakes, self.shuffle_seed, self.policy.score_mode,
         )
 
 
@@ -183,6 +195,7 @@ def summarize_record(record):
     return {
         "date": record.date,
         "beam_width": record.beam_width,
+        "score_mode": record.score_mode,
         "allowed_incorrect_guesses": record.max_mistakes,
         "shuffle_seed": record.shuffle_seed,
         "won": record.final_state.won,

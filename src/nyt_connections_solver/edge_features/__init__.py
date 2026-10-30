@@ -5,7 +5,7 @@ from .resources import EnglishLexicon, EmbeddingStore
 from .semantic import SemanticSimilarity, WordNetSimilarity
 from .character_overlap import CharacterOverlap
 from .substrings import SubstringSimilarity
-from .phrases import PhraseCompletions
+from .phrases import PhraseCompletions, ClosedCompoundCompletions
 from .anagrams import Anagrams
 from .spelling_structure import SpellingStructure
 

@@ -220,20 +220,33 @@ class FeedbackSearchHarness:
     at every state, before beam truncation.
     """
 
-    def __init__(self, scorer: GroupScorer, *, beam_width=20, capture_trace=False):
+    def __init__(self, scorer: GroupScorer, *, beam_width=20, capture_trace=False,
+                 full_board_weight=0.0, score_mode="path", weakest_group_weight=0.0):
         if beam_width < 1:
             raise ValueError("beam_width must be positive")
         self.scorer = scorer
         self.beam_width = beam_width
         self.last_plan: tuple[Group, ...] = ()
         self.capture_trace = capture_trace
+        if full_board_weight < 0:
+            raise ValueError("full_board_weight must be nonnegative")
+        self.full_board_weight = float(full_board_weight)
+        if score_mode not in ("path", "full_board"):
+            raise ValueError("score_mode must be 'path' or 'full_board'")
+        self.score_mode = score_mode
+        if weakest_group_weight < 0 or (weakest_group_weight and score_mode != "full_board"):
+            raise ValueError("weakest_group_weight requires full_board mode and must be nonnegative")
+        self.weakest_group_weight = float(weakest_group_weight)
         self.last_trace: DecisionTrace | None = None
 
     @classmethod
-    def from_harness(cls, harness, *, beam_width=None, max_cached_states=1024, capture_trace=False):
+    def from_harness(cls, harness, *, beam_width=None, max_cached_states=1024,
+                     capture_trace=False, full_board_weight=0.0, score_mode="path",
+                     weakest_group_weight=0.0):
         return cls(ModelGroupScorer(harness, max_cached_states=max_cached_states),
                    beam_width=harness.beam_width if beam_width is None else beam_width,
-                   capture_trace=capture_trace)
+                   capture_trace=capture_trace, full_board_weight=full_board_weight,
+                   score_mode=score_mode, weakest_group_weight=weakest_group_weight)
 
     @classmethod
     def from_model(cls, model, word_embedder=None, *, capture_trace=False, **harness_options):
@@ -248,6 +261,11 @@ class FeedbackSearchHarness:
         if constraints.completion(constraints.remaining, constraints.satisfied) is None:
             raise ValueError("Public feedback admits no valid partition")
         self.scorer.prepare(state.words)
+        full_board_scores = (
+            {frozenset(row.words): row.log_probability
+             for row in self.scorer.score_states([state.words])[0]}
+            if self.full_board_weight or self.score_mode == "full_board" else None
+        )
         # remaining mask, chosen masks, summed score, satisfied one-away flags
         beam = [(constraints.remaining, (), 0.0, constraints.satisfied)]
         root_candidates = ()
@@ -270,8 +288,23 @@ class FeedbackSearchHarness:
                 for candidate in conditioned:
                     group = constraints.mask(candidate.words)
                     flags = constraints.group_flags(group)
+                    next_remaining = remaining ^ group
+                    extra = 0.0
+                    if full_board_scores is not None and remaining.bit_count() > 4:
+                        extra = full_board_scores[frozenset(candidate.words)]
+                        if next_remaining.bit_count() == 4:
+                            extra += full_board_scores[frozenset(constraints.decode(next_remaining))]
+                    if self.score_mode == "full_board":
+                        scored_groups = groups + (group,)
+                        if next_remaining.bit_count() == 4:
+                            scored_groups += (next_remaining,)
+                        values = [full_board_scores[frozenset(constraints.decode(mask))]
+                                  for mask in scored_groups]
+                        next_score = sum(values) + self.weakest_group_weight * min(values)
+                    else:
+                        next_score = score + candidate.log_probability + self.full_board_weight * extra
                     children.append((remaining ^ group, groups + (group,),
-                                     score + candidate.log_probability, satisfied | flags))
+                                     next_score, satisfied | flags))
             children.sort(key=lambda path: path[2], reverse=True)
             beam = []
             seen = set()

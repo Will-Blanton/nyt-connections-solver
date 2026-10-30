@@ -36,12 +36,20 @@ class EnglishLexicon:
         self.words = frozenset(w for w in self.entries if w.isalpha())
         self.preceding = defaultdict(set)
         self.following = defaultdict(set)
+        self.closed_preceding = defaultdict(set)
+        self.closed_following = defaultdict(set)
         for entry in self.entries:
             tokens = entry.split()
             for split in range(1, len(tokens)):
                 left, right = ' '.join(tokens[:split]), ' '.join(tokens[split:])
                 self.preceding[right].add(left)
                 self.following[left].add(right)
+        for entry in self.words:
+            for split in range(2, len(entry) - 1):
+                left, right = entry[:split], entry[split:]
+                if left in self.words and right in self.words:
+                    self.closed_following[left].add(right)
+                    self.closed_preceding[right].add(left)
         self.identity = {'type': 'english_lexicon', 'version': 1,
                          'entries': fingerprint(sorted(self.entries)),
                          'wordnet_version': self.wordnet.get_version() if self.wordnet is not None else None}
