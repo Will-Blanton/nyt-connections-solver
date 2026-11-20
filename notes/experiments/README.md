@@ -36,6 +36,13 @@ Hit@1 **33.06%**; do not assign it the three-seed aggregate solve rate.
 [Final comparison and refit protocol](reports/gine-v1-refit/report.md) ·
 [Five-fold tuning](reports/gine-coherence-cv/report.md)
 
+The supported production script completed a full verification run on November 20:
+1,878 updates, checkpoint reload, all 121 feedback games, and s2/s3/s4 rankings.
+It solved 26/121 with s4 Hit@1 37.19%. Recipe/features/splits match the selected
+baseline, but the weights differ numerically from the older run; this was pipeline
+verification, not new model selection. The selected checkpoint above is unchanged.
+See the [verification report](reports/baseline-verification-20261120/report.md).
+
 ## Main findings and decisions
 
 These are exploratory findings under the particular controls in each report,

@@ -1,142 +1,202 @@
-# 🧩 NYT Connections – Automatic Solver
+# NYT Connections Solver
 
-This project reframes the *NYT Connections* puzzle as a **machine learning problem**, where the goal is to automatically identify the four semantically related words within each daily puzzle set.
+A machine learning solver for [NYT Connections](https://www.nytimes.com/games/connections).
+The puzzle asks players to divide 16 words into four groups of four, with a shared
+connection in each group. Correct guesses reveal groups; incorrect guesses may
+reveal that three words belong together. Four mistakes end the game.
 
-Inspect saved text/spelling graph models with the Streamlit diagnostic app:
+The project combines a learned group scorer with feedback-aware search. Connections
+range from synonyms and common phrases to spelling tricks and cultural references,
+making this a useful setting for exploring how learned representations and explicit
+relational features work together with limited training data.
+
+## Current model
+
+The selected baseline is a candidate-local **GINE** graph neural network. It scores
+every four-word candidate: 1,820 candidates on a full 16-word board. Each candidate
+is a complete four-node graph whose nodes represent words and whose edges contain
+relation features.
+
+The active scoring path is:
+
+```text
+Frozen Qwen word vectors (1024 dimensions)
+  → learned LayerNorm and Linear(1024, 256) + ReLU
+  → learned Linear(256, 64)
+  → three GINE message-passing layers within each candidate
+  → concatenate mean and max node pooling (128 dimensions)
+  → Linear(128, 64) + ReLU → Linear(64, 1)
+  → candidate score
+```
+
+Each GINE layer learns how edge features modify incoming node messages, sums
+messages from the other three words, and updates the receiving word through an
+MLP. All active projection, normalization, GINE and readout parameters train from
+scratch; only the original Qwen vectors stay frozen. There is no active global
+message-passing or attention encoder in this baseline. Board-wide compatibility
+is handled by the search over complete partitions.
+
+### Features
+
+Nodes use 1024-dimensional vectors from `Qwen/Qwen3-Embedding-0.6B`, with the
+model revision pinned in [the baseline configuration](config/gine-baseline.json).
+The selected model uses text-only node inputs. Its 15 ordered edge channels are:
+
+| Relation family | Channels |
+|---|---|
+| Semantics | Word embedding cosine; WordNet sense overlap; rare-concept overlap |
+| Characters | Longest common substring; common prefix; common suffix |
+| Fragment semantics | Similarity between valid word prefixes; similarity between valid word suffixes |
+| Phrase completion | Shared preceding word; shared following word |
+| Anagrams | Exact anagram; character-multiset overlap |
+| Spelling structure | Both palindromes; both initial double letters; both consecutive double-letter pairs |
+
+WordNet supplies English lexical resources. Its senses contribute to edge
+features, not additional node embeddings. Features are cached and reused across
+candidate groups and residual boards. Checkpoints record the embedding revision,
+lexical fingerprints, feature options and channel order; loading rejects mismatches.
+Phonetic, transformation, Wiktionary and other experimental variants remain
+available for research or checkpoint compatibility, but are not enabled in the
+selected recipe.
+
+### Training objective
+
+Training maximizes the total softmax probability assigned to any official correct
+group in the current state. A small probability-floor penalty discourages assigning
+negligible probability to the other correct groups. This replaces the earlier
+graded-relevance/NDCG training formulation.
+
+The selected refit uses 1,089 original train+validation puzzles, batch size 16,
+and 1,878 optimizer updates. Training interleaves states with two, three and four
+remaining groups equally from the start. It uses constant AdamW learning rate
+`0.0009802617130802425`, weight decay `0.005032124249909019`, dropout zero, and
+floor weight/beta `0.1/0.1`. There is no curriculum, scheduler, staged freezing,
+early stopping or test-based checkpoint selection during this refit.
+
+The configuration contains explicit training and held-out dates. Additional dates
+in the dataset are not automatically added to training. See the
+[training guide](notes/training.md) for changing inputs or running a new recipe.
+
+## Feedback-aware search
+
+The harness uses beam search over disjoint groups, with beam width 20 in the
+selected setup. In `full_board` mode it scores a complete partition by summing
+all four groups' scores from the original board, including the forced final group.
+These are model scores, not calibrated probabilities of solving the puzzle.
+
+After each guess, it recomputes the feasible search using public feedback:
+
+- A correct guess removes that group.
+- An ordinary incorrect guess excludes candidate groups sharing three or four
+  words with it.
+- A one-away response requires some true group to share exactly three words with
+  the guess, without assuming which triple is correct.
+
+Retained paths must admit a complete partition consistent with all feedback.
+Failed groups cannot be submitted again. Feedback feasibility checks are exact;
+beam search approximates the best-scoring feasible partition. Gold answers are
+used by the historical environment and diagnostics, not by the scoring policy.
+
+The environment protocol separates game feedback from the model and search.
+The current implementation plays historical puzzles; a live website/backend is
+the next development stage.
+
+## Setup and training
+
+Run commands from the repository root. The development environment uses Nix,
+Python 3.11 and uv, with PyTorch CUDA 12.8 wheels configured in `pyproject.toml`.
+
+```bash
+nix develop -c uv sync
+nix develop -c uv run python -m nltk.downloader wordnet
+nix develop -c uv run python scripts/train.py
+```
+
+Supply the historical CSV at `data/connections.csv`, or use `--dataset` to override
+its location. The historical format contains a row index, `date`, `category` and
+`connections`; `connections` stores a four-word Python list literal. Each puzzle
+has four rows, ordered Purple, Blue, Green, Yellow. Dataset files, model weights
+and caches are not included in Git and must be transferred or prepared separately.
+The pinned Qwen model is loaded through SentenceTransformers.
+
+Training creates a new directory under `weights/` containing `model.pt`, the
+effective configuration, training history, completion status and checkpoint
+checksum. Existing output directories are rejected. If matching features are
+already cached, use `--cache-only` to avoid loading Qwen. Training does not require
+an old checkpoint, archived runner, or notebook execution.
+
+## Evaluation and diagnostics
+
+Evaluate a saved model with the historical feedback harness, replacing the
+checkpoint path with your run directory:
+
+```bash
+nix develop -c uv run python scripts/evaluate_graph_feedback.py \
+  weights/RUN_DIRECTORY/model.pt \
+  --split test --beam-width 20 --score-mode full_board \
+  --output experiments/feedback-evaluation.json
+```
+
+The default refit has no validation dates because it fits the original
+train+validation pool. Evaluation is a separate explicit action. The original test
+split has already been inspected repeatedly; use newly collected chronological
+puzzles or future live games for prospective evaluation and further model selection.
+
+Inspect models interactively:
 
 ```bash
 nix develop -c uv run streamlit run scripts/diagnose.py
 ```
 
-Select a checkpoint and puzzle, step through feedback-aware search, or run a batch
-and replay its rankings, predicted groups, word projections, and ground truth.
-See [the diagnostic app guide](notes/model-diagnostics.md) for details.
+The app supports historical step-through play, batch runs and replay, candidate
+rankings, predicted partitions, edge heatmaps, and 2D word projections alongside
+ground truth. It reconstructs registered checkpoints through the shared loader.
+See the [diagnostics guide](notes/model-diagnostics.md) for controls and interpretation.
 
-For the selected GINE baseline, experiment findings, and deployment handoff,
-start with [the experiment record](notes/experiments/README.md).
-
-Train the selected candidate-local GINE baseline from scratch:
+Run the production tests:
 
 ```bash
-nix develop -c uv run python scripts/train.py
+nix develop -c uv run python -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-See [training and production tests](notes/training.md) for inputs, the fixed recipe,
-and checkpoint outputs. Older research runners and their tests are preserved in
-[`archive/research/`](archive/research/README.md).
+### Latest pipeline verification
 
----
+On November 20, 2026, a fresh full-budget run completed training, checkpoint
+reconstruction, ranking evaluation and all 121 historical held-out games:
 
-## 🧠 What Is *Connections*?
+| Metric | Result |
+|---|---:|
+| Complete harness solves | 26/121 (21.5%) |
+| Harness first-guess accuracy | 36.4% |
+| Full-board model Hit@1 | 37.2% |
+| Full-board model MRR | 0.4775 |
+| Full-board model Hit@4 | 56.2% |
 
-*Connections* is a daily word-grouping puzzle published by *The New York Times*, where players must find four disjoint groups of four words, each linked by a hidden theme. The player has four attempts to solve the puzzle — if all guesses are used, the solution is revealed.
+Raw model Hit@1 accepts any correct group; the harness can choose a different
+first guess because it scores complete partitions. Reduced-state ranking uses
+oracle remaining groups and is distinct from actual game trajectories. The run
+matches the selected recipe and feature definitions, but its learned weights are
+not bitwise identical to the earlier refit. This verifies the production pipeline;
+it is not a new unbiased benchmark or evidence of a reliable performance gain.
+See the [verification report](notes/experiments/reports/baseline-verification-20261120/report.md).
 
-If you haven’t played before, you can try it here:  
-👉 https://www.nytimes.com/games/connections
+## Research record and next steps
 
----
+The dataset is small relative to the variety of connection types. Similarity can
+solve many straightforward groups, but factual knowledge, word transformations,
+and superficially plausible near misses remain difficult. A better group-ranking
+metric also does not necessarily produce more complete solves.
 
-## 🎯 Why Automate *Connections*?
+The next branch will focus on website infrastructure, live-board input and feedback,
+session persistence, and prospective evaluation with the current model. Further
+feature learning or Connections-specific pretraining remains a research direction.
 
-The puzzle’s objective — splitting 16 words into 4 semantically coherent groups — is flexible and open-ended, ranging from simple lexical similarity to abstract themes (e.g., “titles of Matt Damon movies”).  
+- [Experiment overview, selected model and deployment handoff](notes/experiments/README.md)
+- [Report inventory and checkpoint provenance](notes/experiments/manifest.json)
+- [Training configuration and workflow](notes/training.md)
+- [Archived research scripts and tests](archive/research/README.md)
 
-This makes *Connections* an excellent testbed for exploring:
-- Word representation strategies (semantic, phonographic, or knowledge-based),
-- Multi-modal reasoning (e.g., cultural, phonetic, and contextual cues),
-- Different machine-learning architectures,
-- And ranking methods that balance semantic similarity and structural constraints.
-
-Beyond that, it’s just a fun way to apply machine learning to a challenging, creative reasoning problem. I aim to continue to flesh out this project with different architectures/approaches over the years and develop a benchmark for comparison.
-
----
-
-## ⚙️ Historical Approach: Set Transformer + Listwise Learning-to-Rank (LTR)
-
-The sections below describe the earlier research approach. The current baseline
-is the GINE model documented in the training guide above.
-
-### Model Architecture
-
-Because *Connections* depends on contextual relationships between words that vary per puzzle, simple embedding-based scorers (like an MLP) struggle to generalize.  
-
-To address this, I use a **Set Transformer** architecture — a transformer variant that is **order-invariant**, making it naturally suited for reasoning over unordered word sets. The self-attention mechanism helps learn the *connections* among items within each puzzle.
-
-**Levels of Application:**
-1. **Global (16-word set):** Learn contextualized embeddings for all items.  
-2. **Group-level (4-word subsets):** Use attention to generate a single vector representation per candidate group, which is then scored.
-
----
-
-### Training Pipeline
-
-1. **Train Baseline:** Simple MLP scorer (static word embeddings).  
-2. **Add Attention:** Global set attention + MLP scorer.  
-3. **Full Model:** Global attention + Set Transformer encoder–decoder + MLP scorer.
-
-This incremental design ensures each architectural enhancement provides measurable improvements.
-
-**Note**: 1 and 2 are implemented so far, but with limited tuning.
-
----
-
-### 🧩 Listwise Learning-to-Rank (LTR)
-
-LTR learns to assign scores to items in a list such that their relative order reflects true relevance. Unlike pairwise losses, **listwise losses** directly optimize metrics like **NDCG**, making them ideal for ranking tasks such as recommendation systems and search re-ranking.
-
-#### Application to *Connections*
-
-Each puzzle contains 16 words, so all 4-word combinations (1820 total) are computationally manageable on modern GPUs.  
-I frame the problem as **graded relevance**:
-
-| Group Composition | Relevance (y) |
-|--------------------|---------------|
-| All 4 from same group | 4 |
-| 3 of 4 from same group | 3 |
-| 2 of 4 from same group | 2 |
-| All different groups | 1 |
-
-The model learns to rank these combinations such that true groups appear near the top.
-
----
-
-### 💡 Why LTR?
-
-While many approaches are possible (LLM fine-tuning, contrastive clustering, differentiable grouping, etc.), LTR offers a **balanced mix of efficiency, interpretability, and scalability**:
-
-- **Dense supervision:** Each list encodes rich relative information.  
-- **Natural multi-guess structure:** If one guess is wrong, subsequent ranks can be tried.  
-- **Process of elimination:** Correct guesses reduce the search space (similar to how humans solve the puzzle).
-- **Practicality:** Easier to implement and tune with limited data.
-
-Additionally, I have prior research experience with LTR methods, making this a practical and extensible starting point.
-
----
-
-## ⚠️ Current Limitations
-
-This is an early-stage, ongoing project — both practical and conceptual limitations exist:
-
-- **Limited Dataset (~800 puzzles):**
-  - Slowly grows over time (1 new puzzle per day).
-- **Featurization:**
-  - Currently uses only static semantic embeddings (**This is likely the greatest limitation as of now**)
-  - Future work will explore hybrid features combining:
-    - Pretrained contextual embeddings (e.g., MiniLM, Instructor)
-    - Structured knowledge graph features
-    - Phonetic or morphological similarity cues
-- **Nebulous Definition of “Connections”:**
-  - The concept of a “connection” is inherently open-ended and multi-modal (e.g., semantic, cultural, phonetic, or referential)
-  - A single model may struggle to capture the extreme diversity of connection types, particularly when trap groupings exist that are superficially similar but contextually incorrect
-  - Addressing this will likely require multi-embedding fusion or ensemble reasoning approaches
-
----
-
-## 🚧 Next Steps
-
-- Integrate **attention-based** and **set-transformer** models
-- Explore **knowledge-based** or **phonetic** signals for multi-modal reasoning
-- Evaluate **precision@k**, **MRR**, and group-level accuracy metrics
-- Tune model **hyperparameters** 
-- Explore other **architectures** (e.g., GNN-based, reinforcement learning, set building)
-- Build an interactive **demo** that shows model guesses on real puzzles
-
+Generated outputs under `experiments/` are ignored. Small report snapshots and
+the manifest are tracked under `notes/experiments/`; update them on the research
+machine with `scripts/export_experiment_notes.py`. The archive preserves historical
+source for auditability and is not a production dependency.

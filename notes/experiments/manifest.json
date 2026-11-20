@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "exported_at_utc": "2026-11-20T17:55:01.260264+00:00",
+  "exported_at_utc": "2026-11-20T18:25:42.698047+00:00",
   "scope": "Markdown report snapshots, not an inventory of every optimizer trial or raw run",
   "raw_artifacts": "experiments/ (ignored; research machine only)",
-  "report_count": 60,
+  "report_count": 61,
   "selected_baseline": {
     "winner": "cv",
     "primary_seed": 10,
@@ -76,6 +76,13 @@
     }
   ],
   "reports": [
+    {
+      "title": "Production baseline full-run verification (2026-11-20)",
+      "local_source": "experiments/baseline-verification-20261120/report.md",
+      "snapshot": "reports/baseline-verification-20261120/report.md",
+      "sha256": "dde489d5aa20ef7d035b9d926ee80fb7b2f140216a86880521a2bfd26e42497c",
+      "bytes": 4032
+    },
     {
       "title": "Validation group-mechanism inventory",
       "local_source": "experiments/connection-mechanism-gaps.md",
