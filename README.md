@@ -12,6 +12,19 @@ Select a checkpoint and puzzle, step through feedback-aware search, or run a bat
 and replay its rankings, predicted groups, word projections, and ground truth.
 See [the diagnostic app guide](notes/model-diagnostics.md) for details.
 
+For the selected GINE baseline, experiment findings, and deployment handoff,
+start with [the experiment record](notes/experiments/README.md).
+
+Train the selected candidate-local GINE baseline from scratch:
+
+```bash
+nix develop -c uv run python scripts/train.py
+```
+
+See [training and production tests](notes/training.md) for inputs, the fixed recipe,
+and checkpoint outputs. Older research runners and their tests are preserved in
+[`archive/research/`](archive/research/README.md).
+
 ---
 
 ## 🧠 What Is *Connections*?
@@ -37,7 +50,10 @@ Beyond that, it’s just a fun way to apply machine learning to a challenging, c
 
 ---
 
-## ⚙️ Current Approach: Set Transformer + Listwise Learning-to-Rank (LTR)
+## ⚙️ Historical Approach: Set Transformer + Listwise Learning-to-Rank (LTR)
+
+The sections below describe the earlier research approach. The current baseline
+is the GINE model documented in the training guide above.
 
 ### Model Architecture
 

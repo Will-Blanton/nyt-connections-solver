@@ -9,12 +9,15 @@ nix develop -c uv run streamlit run scripts/diagnose.py
 Open the local address Streamlit prints (normally `http://localhost:8501`).
 For access from another machine, use your usual SSH port forwarding.
 
-The first version supports `*text_spelling*.pt` graph subset checkpoints. Select
-a model, device, and historical dataset, then click **Load model**. The app loads
+The selector discovers registered graph checkpoints recursively under the weights
+directory, including `weights/experiments/` and the standalone GINE notebook's
+new filenames. Graph Set Transformer, edge-residual, GINE-residual, and standalone
+GINE checkpoints are supported. Select a model, device, and historical dataset,
+then click **Load model**. The app loads
 the checkpoint's original embedding revision, feature options, and lexical
 resources and validates the reconstructed feature metadata/channel order.
-Older graph checkpoints, partition models, and color classifiers use other
-formats and are outside this app's current model selector.
+Checkpoints without the registered model/feature metadata are excluded, including
+legacy sense models, partition models, and color classifiers.
 
 Model loading is explicit. A session retains one model and reuses feature and
 residual-score caches while stepping through a board. Changing the checkpoint
@@ -47,9 +50,10 @@ before the inspected guess; the overall game status appears separately.
   download the full ranking as CSV. The maximum gold overlap is an analysis
   overlay. The policy itself receives only correct/one-away/incorrect feedback.
 - **Search paths:** predicted remaining groups, their gold matches, and retained
-  beams at each depth, scored by summed conditional log probabilities.
-- **Word projections & edges:** 2D PCA of frozen text embeddings and learned
-  full-board encoder representations, with word labels and gold group colors;
+  beams at each depth. **Search scoring** defaults to `full_board`, matching the
+  GINE experiments; `path` remains available in the applied run settings.
+- **Word projections & edges:** 2D PCA of frozen text embeddings and optional
+  model-provided representations, with word labels and gold group colors;
   pairwise input-edge heatmaps for each named feature channel.
 - **Ground truth & history:** answer groups and the submitted guess transcript.
 
@@ -63,15 +67,21 @@ answers use neutral numbered group labels instead.
 
 Raw softmax mass is a next-choice score, not a calibrated probability of being
 correct. After-pruning probabilities renormalize scores over **every** feasible
-choice at the current state, before beam truncation. Search uses those same
-conditional log probabilities and recomputes them at every hypothetical residual
-state and after feedback changes. Cached raw model scores remain reusable. The
-harness can choose a lower-ranked next group because it scores complete paths.
+choice at the current state, before beam truncation. In `full_board` mode, search
+scores complete partitions using all four groups' original-board scores, including
+the last group. In `path` mode it sums conditional log probabilities recomputed
+at residual states. Both recompute the feasible search after feedback changes;
+cached raw model scores remain reusable. The harness can choose a lower-ranked
+next group because it scores complete paths.
 Beam search approximates the score optimum while feasibility pruning is exact.
 
 PCA is fit once per original board and remains fixed as guesses are made.
-Learned representations are computed on the full original board, not each
-residual state. The explained-variance caption shows how much information the
+Standalone GINE displays the actual learned input to candidate message passing.
+It does not run the unused inherited attention encoder: GINE's later word vectors
+depend on the candidate's other three words and have no single board-wide value.
+Attention models can additionally display their full-board encoder vectors.
+Models without a representation hook still work with the raw node-feature view;
+models without edge features omit the heatmap. The explained-variance caption shows how much information the
 2D view retains. Edge heatmaps show supplied input features, not attention
 weights or causal feature attribution.
 
@@ -95,6 +105,25 @@ Batch evaluation is explicit and does not run on every UI rerun. It runs the sam
 feedback policy as interactive mode. Saving diagnostics increases time and memory
 relative to ordinary evaluation: every candidate ranking and retained beam is
 kept for replay. Start with a few dates before processing an entire split.
+
+## Adding a model
+
+The UI does not select architectures itself. `checkpoints.py` owns a shared registry;
+register a trusted `torch.nn.Module` with `register_graph_model(MyModel)` in code
+loaded by the application. Its constructor accepts `group_idx` and `model_config`.
+Its forward interface is `forward(x, group_idx=..., edge_features=...)` and returns
+one finite score per candidate, shaped `(batch, candidates)` or `(batch, candidates, 1)`.
+Save the usual feature, embedding, configuration and split metadata. Models needing
+new feature providers must also supply reproducible reconstruction for those providers.
+
+`SearchHarness` handles feature encoding; `ModelGroupScorer` adapts it to the existing
+`GroupScorer` protocol; `FeedbackSearchHarness` handles feedback and partition search.
+Interactive play and batch play use that same chain. No architecture-specific UI
+branch or new game/search harness is needed for a model using this interface.
+
+For optional learned PCA views, implement
+`diagnostic_representations(nodes, edges) -> dict[str, Tensor]`, returning one row
+per original word. This hook is separate from scoring and receives no answers.
 
 ## Verification
 
