@@ -201,7 +201,7 @@ class GatedEdgeResidual(GraphSetTransformer):
 
 
 class CandidateGINE(nn.Module):
-    """Dense GINE on four-word candidates, without diagonal/self messages.
+    """Dense GINE on candidates, without diagonal/self messages.
 
     h'_i = MLP((1 + eps) h_i + sum_{j != i} ReLU(h_j + W_e e_ij)).
     Each layer has its own edge projection, MLP, and trainable scalar epsilon.
@@ -232,13 +232,14 @@ class CandidateGINE(nn.Module):
                 for projection in self.edge_projections
             ])
 
-    def forward(self, words, edges):
+    def forward(self, words, edges, edge_mask=None):
         h = self.node_projection(words)
         diagonal = torch.eye(h.shape[-2], device=h.device, dtype=torch.bool)
+        excluded = diagonal if edge_mask is None else diagonal | ~edge_mask
         for layer, (edge_projection, update) in enumerate(zip(self.edge_projections, self.updates)):
             # Axes: (..., receiving word i, sending word j, hidden).
             messages = torch.relu(h.unsqueeze(-3) + edge_projection(edges))
-            messages = messages.masked_fill(diagonal[..., None], 0)
+            messages = messages.masked_fill(excluded[..., None], 0)
             h = update((1 + self.eps[layer]) * h + messages.sum(dim=-2))
         return torch.cat([h.mean(dim=-2), h.amax(dim=-2)], dim=-1)
 
@@ -275,18 +276,40 @@ class GatedGINEResidual(GatedEdgeResidual):
 
 
 class StandaloneCandidateGINE(GatedGINEResidual):
-    """Score each four-word candidate with GINE alone, without attention scores."""
+    """Score each candidate with GINE, optionally exposing raw edge summaries.
+
+    No attention scores; edge_summary_width=0 preserves the original readout.
+    """
 
     def __init__(self, *, edge_hidden=32, gine_layers=2, train_text_projection=False,
                  train_input_norm=False, raw_text_embeddings=False,
                  projection_width=None, adapter_hidden=None, single_layer_adapter=False,
-                 gine_dropout=0., readout_width=128, **config):
+                 gine_dropout=0., readout_width=128, sparse_edge_thresholds=None,
+                 edge_coherence_scale=0., candidate_edge_channels=(), edge_summary_width=0, **config):
+        if isinstance(edge_summary_width, bool) or not isinstance(edge_summary_width, int) or edge_summary_width < 0:
+            raise ValueError('edge_summary_width must be a nonnegative integer')
+        self.edge_summary_width = edge_summary_width
+        if not 0 <= edge_coherence_scale < float('inf'):
+            raise ValueError("edge_coherence_scale must be finite and nonnegative")
+        self.edge_coherence_scale = float(edge_coherence_scale)
+        channels = tuple(candidate_edge_channels)
+        if len(set(channels)) != len(channels) or any(isinstance(c, bool) or not isinstance(c, int)
+                or c < 0 or c >= config['edge_dim'] for c in channels):
+            raise ValueError('Candidate edge channels must be distinct valid channel indices')
+        self.candidate_edge_channels = channels
         if single_layer_adapter:
             if adapter_hidden is not None:
                 raise ValueError("Choose either a single-layer adapter or a bottleneck adapter")
             adapter_hidden = config["in_dim"]
         super().__init__(edge_hidden=edge_hidden, gine_layers=gine_layers,
                          gine_input_stage="projected", gine_dropout=gine_dropout, **config)
+        if sparse_edge_thresholds is not None:
+            thresholds = torch.as_tensor(sparse_edge_thresholds)
+            if thresholds.shape != (self.edge_dim,) or not torch.isfinite(thresholds).all() or (thresholds < 0).any():
+                raise ValueError("Sparse thresholds must be finite nonnegative values, one per edge channel")
+        # Stored in model_config; nonpersistent buffer preserves old checkpoint layouts.
+        self.register_buffer("sparse_edge_thresholds", None if sparse_edge_thresholds is None else
+                             torch.tensor(sparse_edge_thresholds, dtype=torch.float32), persistent=False)
         if projection_width is not None:
             if projection_width < 1 or raw_text_embeddings:
                 raise ValueError("projection_width must be positive and requires projected embeddings")
@@ -332,8 +355,20 @@ class StandaloneCandidateGINE(GatedGINEResidual):
                 )
                 nn.init.zeros_(self.embedding_adapter[-1].weight)
                 nn.init.zeros_(self.embedding_adapter[-1].bias)
+        if edge_summary_width:
+            # Construct last: legacy GINE/readout initialization stays unchanged.
+            self.edge_summary_encoder = nn.Sequential(
+                nn.Linear(self.edge_dim * 3, edge_summary_width), nn.ReLU(),
+                nn.Linear(edge_summary_width, edge_summary_width), nn.ReLU())
+            original = self.group_readout[0]
+            expanded = nn.Linear(original.in_features + edge_summary_width, original.out_features)
+            with torch.no_grad():
+                expanded.weight.zero_()
+                expanded.weight[:, :original.in_features].copy_(original.weight)
+                expanded.bias.copy_(original.bias)
+            self.group_readout[0] = expanded
 
-    def forward(self, x, group_idx=None, edge_features=None):
+    def forward(self, x, group_idx=None, edge_features=None, candidate_edge_features=None):
         B, N, _ = x.shape
         if edge_features is None or edge_features.shape != (B, N, N, self.edge_dim):
             raise ValueError("Expected complete pairwise edge features")
@@ -341,10 +376,80 @@ class StandaloneCandidateGINE(GatedGINEResidual):
         edges = edge_features[:, idx[:, :, None], idx[:, None, :], :]
         words = self.encode_input_words(x)
         candidates = self.grouper(words, group_idx=idx)
-        B, C, _, D = candidates.shape
-        pooled = self.edge_encoder(candidates.reshape(B * C, 4, D),
-                                   (edges * self.residual_edge_mask).reshape(B * C, 4, 4, self.edge_dim))
+        B, C, group_size, D = candidates.shape
+        candidate_edges = (edges * self.residual_edge_mask).reshape(B * C, group_size, group_size, self.edge_dim)
+        if self.candidate_edge_channels:
+            if candidate_edge_features is None or candidate_edge_features.shape != (B, C, len(self.candidate_edge_channels)):
+                raise ValueError('Expected candidate_edge_features aligned with group_idx and configured channels')
+            if not torch.isfinite(candidate_edge_features).all() or (candidate_edge_features < 0).any() or (candidate_edge_features > 1).any():
+                raise ValueError('Candidate edge features must be finite and in [0, 1]')
+            candidate_edges = candidate_edges.clone()
+            values = candidate_edge_features.reshape(B*C, 1, 1, -1)
+            values = values * self.residual_edge_mask[list(self.candidate_edge_channels)]
+            off_diagonal = ~torch.eye(group_size, device=x.device, dtype=torch.bool)
+            candidate_edges[..., list(self.candidate_edge_channels)] = values * off_diagonal[None,:,:,None]
+        elif candidate_edge_features is not None:
+            raise ValueError('Configure candidate_edge_channels before supplying candidate features')
+        mask = None if self.sparse_edge_thresholds is None else self.edge_connectivity(candidate_edges)
+        summary = (self.edge_summary_encoder(self.summarize_candidate_edges(candidate_edges))
+                   if self.edge_summary_width else None)
+        candidate_edges = self.modify_candidate_edges(candidate_edges)
+        pooled = self.edge_encoder(candidates.reshape(B * C, group_size, D), candidate_edges, edge_mask=mask)
+        if summary is not None:
+            pooled = torch.cat([pooled, summary], dim=-1)
         return self.group_readout(pooled).reshape(B, C, 1)
+
+    @staticmethod
+    def summarize_candidate_edges(edges):
+        """Per-channel mean, minimum, and weakest word's mean; exclude self edges.
+
+        Uses raw masked candidate edges, including exact shared-witness overrides.
+        Symmetric inputs therefore summarize the six unordered quartet pairs.
+        Channel identity is retained; no pooling across relation dimensions.
+        """
+        count = edges.shape[-2]
+        if count < 2 or edges.shape[-3] != count:
+            raise ValueError('Expected a square candidate graph with at least two words')
+        diagonal = torch.eye(count, device=edges.device, dtype=torch.bool)
+        off_diagonal = edges.masked_fill(diagonal[..., None], 0)
+        mean = off_diagonal.sum(dim=(-3, -2)) / (count * (count - 1))
+        minimum = edges.masked_fill(diagonal[..., None], float('inf')).amin(dim=(-3, -2))
+        weakest = (off_diagonal.sum(dim=-2) / (count - 1)).amin(dim=-2)
+        return torch.cat([mean, minimum, weakest], dim=-1)
+
+    def modify_candidate_edges(self, edges):
+        """Amplify a channel when every candidate word supports that relation.
+
+        Coherence is the minimum over words of their mean off-diagonal incoming
+        edge value. Compute once on raw candidate edges, before GINE layers;
+        preserve relation identity, connectivity, and the unmodified input tensor.
+        The default zero scale returns the exact legacy tensor and computation.
+        """
+        if not self.edge_coherence_scale:
+            return edges
+        count = edges.shape[-2]
+        if count < 2:
+            raise ValueError("Coherence requires at least two candidate words")
+        diagonal = torch.eye(count, device=edges.device, dtype=torch.bool)
+        off_diagonal = edges.masked_fill(diagonal[..., None], 0)
+        coherence = (off_diagonal.sum(dim=-2) / (count - 1)).amin(dim=-2)
+        # Signed/experimental channels must not invert or attenuate messages.
+        coherence = coherence.clamp(0, 1)
+        return off_diagonal * (1 + self.edge_coherence_scale * coherence[..., None, None, :])
+
+    def edge_connectivity(self, edges):
+        """Keep a pair if any channel clears its training-fitted threshold.
+
+        Zero is absence of evidence even for zero-valued thresholds. No self
+        messages or nearest-neighbor fallback; isolated words retain their own
+        representation through the usual GINE self term.
+        """
+        if self.sparse_edge_thresholds is None:
+            keep = torch.ones(edges.shape[:-1], dtype=torch.bool, device=edges.device)
+        else:
+            keep = ((edges > 0) & (edges >= self.sparse_edge_thresholds)).any(dim=-1)
+        diagonal = torch.eye(edges.shape[-2], device=edges.device, dtype=torch.bool)
+        return keep & ~diagonal
 
     def encode_input_words(self, x):
         """Representations actually supplied to candidate-local GINE."""

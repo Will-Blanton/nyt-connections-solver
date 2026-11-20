@@ -67,6 +67,8 @@ class ModelGroupScorer:
         self._positions = {word: i for i, word in enumerate(words)}
         self._scores.clear()
         self.nodes, self.edges = self.harness.encode_puzzle(words)
+        builder = getattr(self.harness, 'encode_candidate_features', None)
+        self.candidate_features = builder(words) if builder is not None else None
 
     def score_states(self, states: Sequence[Group]) -> list[tuple[ScoredGroup, ...]]:
         import torch
@@ -93,6 +95,11 @@ class ModelGroupScorer:
                         device=harness.device, dtype=torch.long,
                     )
                     kwargs = {}
+                    if self.candidate_features is not None:
+                        from .candidate_features import slice_candidate_features
+                        kwargs['candidate_edge_features'] = torch.stack([
+                            slice_candidate_features(self.candidate_features, row, group_idx=candidates)
+                            for row in positions])
                     if self.edges is not None:
                         kwargs["edge_features"] = self.edges[
                             positions[:, :, None], positions[:, None, :]

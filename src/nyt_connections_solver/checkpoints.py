@@ -7,12 +7,16 @@ from sentence_transformers import SentenceTransformer
 
 from .graph_features import build_graph_features
 from .graph_models import GraphSetTransformer, GatedEdgeResidual, GatedGINEResidual, StandaloneCandidateGINE
+from .phonetic_models import PhoneticFusionGINE
+from .additive_models import AdditiveGINE
+from .transformation_models import TransformationGINE
 from .edge_features import EdgeFeatureComposer, ClosedCompoundCompletions
 from .harness import SearchHarness
 
 
 GRAPH_MODEL_TYPES = {cls.__name__: cls for cls in (
-    GraphSetTransformer, GatedEdgeResidual, GatedGINEResidual, StandaloneCandidateGINE)}
+    GraphSetTransformer, GatedEdgeResidual, GatedGINEResidual, StandaloneCandidateGINE, PhoneticFusionGINE,
+    AdditiveGINE, TransformationGINE)}
 
 
 def register_graph_model(model_type, *, name=None):
@@ -59,6 +63,8 @@ def load_graph_harness(weights_path, device="auto", beam_width=20, state_batch_s
     if metadata != checkpoint["feature_metadata"] or list(edges.feature_names) != checkpoint["edge_feature_names"]:
         raise ValueError("Feature definitions or lexical resources differ from the checkpoint")
     config = checkpoint["model_config"]
+    if tuple(config.get('candidate_edge_channels', ())) != tuple(getattr(edges, 'candidate_feature_channels', ())):
+        raise ValueError('Checkpoint candidate edge channels do not match feature definitions')
     if config["in_dim"] != nodes.dim or config["edge_dim"] != edges.dim:
         raise ValueError("Checkpoint feature dimensions do not match")
     model = GRAPH_MODEL_TYPES[checkpoint["model_class"]](group_idx=torch.tensor([[0, 1, 2, 3]]), **config)

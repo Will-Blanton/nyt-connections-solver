@@ -2,6 +2,7 @@
 
 from html import escape
 from pathlib import Path
+import pickle
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,7 +13,7 @@ import pandas as pd
 import streamlit as st
 import torch
 
-from nyt_connections_solver.checkpoints import load_graph_harness
+from nyt_connections_solver.checkpoints import load_graph_harness, supports_graph_checkpoint
 from nyt_connections_solver.evaluation import load_puzzles
 from nyt_connections_solver.evaluation.diagnostics import DiagnosticSession, summarize_record
 
@@ -38,7 +39,8 @@ def display_record(record, *, key):
     st.caption(f"Game status: {status} · {len(state.solved_groups)}/4 groups accepted · "
                f"{state.mistakes_remaining} incorrect guesses left. "
                f"Run settings: beam width {record.beam_width}, "
-               f"allowed incorrect guesses {record.max_mistakes}, shuffle seed {record.shuffle_seed}.")
+               f"allowed incorrect guesses {record.max_mistakes}, shuffle seed {record.shuffle_seed}, "
+               f"scoring {record.score_mode}.")
     if not record.decisions:
         return
     index = st.select_slider(
@@ -98,7 +100,7 @@ def display_record(record, *, key):
                    "true_group", "max_gold_overlap", "chosen", "pruning"]
         st.dataframe(displayed[columns], hide_index=True, width="stretch")
         st.caption("Raw rank uses model softmax over every four-word choice. After-pruning probability "
-                   "renormalizes scores over all feasible choices before beam truncation, and is used by search. "
+                   "renormalizes scores over all feasible choices before beam truncation. "
                    "Neither is a calibrated chance of correctness. "
                    "True groups and the selected guess are always included in the table.")
         chart_rows = displayed.assign(label=displayed.raw_rank.astype(str) + ": " + displayed.words,
@@ -130,9 +132,12 @@ def display_record(record, *, key):
              "true_groups_in_path": sum(frozenset(g) in set(map(frozenset, record.gold_groups)) for g in path.groups)}
             for i, path in enumerate(paths)
         ]), hide_index=True, width="stretch")
-        st.caption("Paths sum log probabilities recomputed after feedback pruning at every residual state. "
-                   "Normalization uses all feasible choices, not just the retained beam. The final group is forced by elimination. "
-                   "Every retained path has a feedback-consistent completion. Beam search approximates the best-scoring path.")
+        if record.score_mode == "full_board":
+            st.caption("Complete partitions use all four groups' original-board log scores, including the final group. "
+                       "Feedback prunes inconsistent partitions and search recomputes after each guess.")
+        else:
+            st.caption("Paths sum conditional log probabilities after pruning at each residual state. "
+                       "Normalization uses every feasible choice. The final group is forced by elimination.")
     with projection_tab:
         representation = st.selectbox("Representation", list(record.projections), key=f"representation_{key}")
         coordinates, variance = record.projections[representation]
@@ -150,22 +155,26 @@ def display_record(record, *, key):
         labels = base.mark_text(dy=-13).encode(text="word:N")
         st.altair_chart((scatter + labels).properties(height=420).interactive(), width="stretch")
         st.caption(f"PCA explains {variance:.1%} of variance in this 16-word board. Coordinates are fixed across guesses. "
-                   "Learned graph encoder vectors use the original full board; they are not recomputed for residual states. "
+                   "Views are supplied by the model on the original board. For standalone GINE, the learned view is "
+                   "its input projection; message-passing vectors depend on the candidate group. "
                    "2D distance is a lossy view, not an explanation of a subset score.")
-        channel = st.selectbox("Pairwise edge feature", record.edge_names, key=f"edge_{key}")
-        values = record.edges[:, :, record.edge_names.index(channel)]
-        cells = pd.DataFrame([
-            {"first": a, "second": b, "value": float(values[i, j])}
-            for i, a in enumerate(record.words) for j, b in enumerate(record.words)
-        ])
-        heatmap = alt.Chart(cells).mark_rect().encode(
-            x=alt.X("first:N", sort=list(record.words), title=None),
-            y=alt.Y("second:N", sort=list(record.words), title=None),
-            color=alt.Color("value:Q", scale=alt.Scale(scheme="blues", domain=[0, 1])),
-            tooltip=["first", "second", "value"],
-        ).properties(height=430)
-        st.altair_chart(heatmap, width="stretch")
-        st.caption("Input edge channel before learned attention projections. This is not an attention-weight map.")
+        if record.edge_names:
+            channel = st.selectbox("Pairwise edge feature", record.edge_names, key=f"edge_{key}")
+            values = record.edges[:, :, record.edge_names.index(channel)]
+            cells = pd.DataFrame([
+                {"first": a, "second": b, "value": float(values[i, j])}
+                for i, a in enumerate(record.words) for j, b in enumerate(record.words)
+            ])
+            heatmap = alt.Chart(cells).mark_rect().encode(
+                x=alt.X("first:N", sort=list(record.words), title=None),
+                y=alt.Y("second:N", sort=list(record.words), title=None),
+                color=alt.Color("value:Q", scale=alt.Scale(scheme="blues")),
+                tooltip=["first", "second", "value"],
+            ).properties(height=430)
+            st.altair_chart(heatmap, width="stretch")
+            st.caption("Supplied input edge features; not attention weights or causal attribution.")
+        else:
+            st.caption("This scorer does not supply pairwise edge features.")
     with history_tab:
         st.dataframe(pd.DataFrame({"group": gold_labels,
                                    "words": [" · ".join(g) for g in record.gold_groups]}), hide_index=True, width="stretch")
@@ -181,23 +190,30 @@ def main():
     st.set_page_config(page_title="Connections model diagnostics", layout="wide")
     # Discard records created before historical colors were preserved. Keep the
     # loaded model so a code reload does not require loading weights again.
-    if st.session_state.get("display_schema") != 3:
+    if st.session_state.get("display_schema") != 4:
         for old_key in ("active", "active_key", "batch_records", "batch_context"):
             st.session_state.pop(old_key, None)
-        st.session_state.display_schema = 3
+        st.session_state.display_schema = 4
+        st.session_state.pop("applied_run_settings", None)
     st.title("Connections model diagnostics")
     st.caption("Inspect model rankings, feedback pruning, projected groups, and word representations against historical answers.")
     st.session_state.setdefault("weights_dir", str(ROOT / "weights"))
     st.session_state.setdefault("dataset_path", str(ROOT / "data/connections.csv"))
     weights_dir = Path(st.sidebar.text_input("Weights directory", key="weights_dir")).expanduser()
-    paths = sorted(weights_dir.glob("*text_spelling*.pt"), reverse=True)
+    paths = []
+    for path in sorted(weights_dir.rglob("*.pt"), reverse=True):
+        try:
+            if supports_graph_checkpoint(checkpoint_metadata(str(path), path.stat().st_mtime_ns)):
+                paths.append(path)
+        except (ValueError, RuntimeError, KeyError, EOFError, OSError, pickle.UnpicklingError):
+            continue
     if not paths:
-        st.info("No text/spelling graph checkpoints found in this directory.")
+        st.info("No registered graph checkpoints found in this directory or its subdirectories.")
         return
-    weights = st.sidebar.selectbox("Saved model", paths, format_func=lambda p: p.name)
+    weights = st.sidebar.selectbox("Saved model", paths, format_func=lambda p: str(p.relative_to(weights_dir)))
     metadata = checkpoint_metadata(str(weights), weights.stat().st_mtime_ns)
-    if metadata.get("model_class") != "GraphSetTransformer" or "feature_metadata" not in metadata:
-        st.error("This checkpoint does not contain the supported text/spelling graph model metadata.")
+    if not supports_graph_checkpoint(metadata):
+        st.error("This checkpoint does not contain registered model and feature metadata.")
         return
     device = st.sidebar.selectbox("Device", ["auto", "cpu", "cuda"])
     dataset = Path(st.sidebar.text_input("Historical dataset", key="dataset_path")).expanduser()
@@ -206,7 +222,7 @@ def main():
         st.error("Checkpoint has no saved split dates.")
         return
     split = st.sidebar.selectbox("Puzzle split", splits)
-    st.session_state.setdefault("applied_run_settings", (20, 4, 0))
+    st.session_state.setdefault("applied_run_settings", (20, 4, 0, "full_board"))
     st.sidebar.subheader("Run settings")
     with st.sidebar.form("run_settings"):
         draft_beam = st.number_input("Beam width", min_value=1, max_value=100, value=20,
@@ -214,16 +230,18 @@ def main():
         draft_mistakes = st.number_input("Allowed incorrect guesses per puzzle", min_value=1, max_value=20, value=4,
                                         help="The game ends after this many incorrect guesses. One-away guesses count; correct guesses do not.")
         draft_seed = st.number_input("Board shuffle seed", min_value=0, value=0)
+        draft_scoring = st.selectbox("Search scoring", ("full_board", "path"),
+                                     help="Full-board scoring matches the current GINE evaluations. Path uses conditional scores at each remaining state.")
         apply_settings = st.form_submit_button("Apply run settings")
     if apply_settings:
-        st.session_state.applied_run_settings = (draft_beam, draft_mistakes, draft_seed)
+        st.session_state.applied_run_settings = (draft_beam, draft_mistakes, draft_seed, draft_scoring)
         st.session_state.pop("active_key", None)
-    beam_width, max_mistakes, seed = st.session_state.applied_run_settings
-    st.sidebar.info(f"Applied: beam {beam_width} · {max_mistakes} allowed incorrect guesses · seed {seed}")
+    beam_width, max_mistakes, seed, score_mode = st.session_state.applied_run_settings
+    st.sidebar.info(f"Applied: beam {beam_width} · {max_mistakes} allowed incorrect guesses · seed {seed} · {score_mode}")
     st.sidebar.caption("Apply settings to restart the current puzzle. Completed batch results stay unchanged until you run the batch again.")
     signature = (str(weights.resolve()), weights.stat().st_mtime_ns, device)
     with st.expander("Checkpoint configuration"):
-        st.json({"file": weights.name, "model": metadata["model_config"],
+        st.json({"file": weights.name, "model_class": metadata["model_class"], "model": metadata["model_config"],
                  "training": {k: v for k, v in metadata.get("training_config", {}).items() if k != "training_summary"},
                  "embedding": metadata["embedding_model_name"],
                  "edge_features": metadata["edge_feature_names"]})
@@ -251,12 +269,12 @@ def main():
     by_date = {p.date: p for p in puzzles}
     dates = sorted(by_date)
     date = st.sidebar.selectbox("Puzzle date", dates)
-    config = (beam_width, max_mistakes, seed)
+    config = (beam_width, max_mistakes, seed, score_mode)
     session_key = (signature, str(dataset.resolve()), dataset.stat().st_mtime_ns, split, date, config)
     if st.session_state.get("active_key") != session_key:
         with st.spinner("Preparing puzzle features…"):
             st.session_state.active = DiagnosticSession(harness, by_date[date], beam_width=beam_width,
-                                                        max_mistakes=max_mistakes, seed=seed)
+                                                        max_mistakes=max_mistakes, seed=seed, score_mode=score_mode)
         st.session_state.active_key = session_key
     session = st.session_state.active
     st.subheader(f"{date} · {split}")
@@ -279,7 +297,7 @@ def main():
     all_puzzles = st.checkbox("Run entire split", value=False)
     selected = dates if all_puzzles else st.multiselect("Puzzles to run", dates, default=dates[:5], key=f"batch_dates_{split}")
     st.info(f"Next batch: {len(selected)} puzzle(s) · beam width {beam_width} · "
-            f"{max_mistakes} allowed incorrect guesses per puzzle · shuffle seed {seed}. "
+            f"{max_mistakes} allowed incorrect guesses per puzzle · shuffle seed {seed} · scoring {score_mode}. "
             "Change these in Run settings and click Apply run settings before starting. "
             "The replay slider only selects which recorded guess to display.")
     if st.button("Run selected puzzles", disabled=not selected):
@@ -288,7 +306,7 @@ def main():
         for i, selected_date in enumerate(selected):
             with st.spinner(f"Playing {selected_date} ({i + 1}/{len(selected)})…"):
                 run = DiagnosticSession(harness, by_date[selected_date], beam_width=beam_width,
-                                        max_mistakes=max_mistakes, seed=seed)
+                                        max_mistakes=max_mistakes, seed=seed, score_mode=score_mode)
                 records[selected_date] = run.finish()
             progress.progress((i + 1) / len(selected))
         st.session_state.batch_records = records
@@ -297,9 +315,9 @@ def main():
     context = (signature, str(dataset.resolve()), dataset.stat().st_mtime_ns, split, config)
     if records:
         recorded_context = st.session_state.get("batch_context")
-        recorded_beam, recorded_mistakes, recorded_seed = recorded_context[-1]
+        recorded_beam, recorded_mistakes, recorded_seed, recorded_scoring = recorded_context[-1]
         st.caption(f"Recorded batch: {Path(recorded_context[0][0]).name} · {recorded_context[3]} split · "
-                   f"beam width {recorded_beam} · {recorded_mistakes} allowed incorrect guesses · seed {recorded_seed}.")
+                   f"beam width {recorded_beam} · {recorded_mistakes} allowed incorrect guesses · seed {recorded_seed} · {recorded_scoring}.")
         if recorded_context != context:
             st.warning("The applied settings or dataset differ from this recorded batch. "
                        "Run selected puzzles again to recompute results with the settings shown above.")

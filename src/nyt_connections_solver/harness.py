@@ -10,6 +10,7 @@ from sentence_transformers import SentenceTransformer
 
 from .models import AttentionModel, Baseline, SetTransformer
 from .wordnet import WordNetFeatureEncoder
+from .candidate_features import slice_candidate_features
 
 
 MODEL_TYPES = {
@@ -135,6 +136,7 @@ class SearchHarness:
         wordnet_encoder: WordNetFeatureEncoder | None = None,
         edge_feature_builder: Callable | None = None,
         node_feature_builder=None,
+        candidate_feature_builder: Callable | None = None,
     ) -> "SearchHarness":
         """Build a harness around in-memory objects, useful for model selection.
 
@@ -170,6 +172,12 @@ class SearchHarness:
             harness.word_embedder.requires_grad_(False)
         harness.wordnet_encoder = wordnet_encoder
         harness.edge_feature_builder = edge_feature_builder
+        owner = getattr(edge_feature_builder, '__self__', None)
+        channels = getattr(owner, 'candidate_feature_channels', ())
+        if channels and tuple(getattr(model, 'candidate_edge_channels', ())) != tuple(channels):
+            raise ValueError('Configure the model with edge_builder.model_options for candidate features')
+        harness.candidate_feature_builder = (candidate_feature_builder if candidate_feature_builder is not None
+                                            else owner.encode_candidates if channels else None)
         harness.node_feature_builder = node_feature_builder
         return harness
 
@@ -213,6 +221,20 @@ class SearchHarness:
 
             return embeddings, edges
 
+    def encode_candidate_features(self, words):
+        """Encode quartet features once; retain original-board row order."""
+        builder = getattr(self, 'candidate_feature_builder', None)
+        expected = tuple(getattr(self.model, 'candidate_edge_channels', ()))
+        if builder is None:
+            if expected:
+                raise ValueError('This model requires a candidate feature builder')
+            return None
+        value = torch.as_tensor(builder(words), device=self.device, dtype=torch.float32)
+        from math import comb
+        if value.shape != (comb(len(words),4),len(expected)) or not torch.isfinite(value).all() or (value < 0).any() or (value > 1).any():
+            raise ValueError('Invalid candidate features or model channel configuration')
+        return value
+
     def solve(self, words: Sequence[str]) -> SearchResult:
         """Return the highest-scoring complete partition and each retained beam."""
         words = tuple(words)
@@ -223,6 +245,7 @@ class SearchHarness:
 
         with torch.inference_mode():
             embeddings, edges = self.encode_puzzle(words)
+            candidate_features = self.encode_candidate_features(words)
 
             remaining = torch.arange(16, device=self.device).unsqueeze(0)  # (1, 16)
             beam_scores = torch.zeros(1, device=self.device)  # (1,)
@@ -236,6 +259,10 @@ class SearchHarness:
                     end = start + self.state_batch_size
                     state_embeddings = embeddings[remaining[start:end]]  # (B, count, D)
                     model_kwargs = {}
+                    if candidate_features is not None:
+                        model_kwargs['candidate_edge_features'] = torch.stack([
+                            slice_candidate_features(candidate_features, row, group_idx=candidates)
+                            for row in remaining[start:end]])
                     if edges is not None:
                         positions = remaining[start:end]  # (B, count)
                         model_kwargs["edge_features"] = edges[

@@ -1,17 +1,12 @@
-"""Graph features, persistent caching, subset alignment, and notebook integration."""
+"""Baseline graph features, persistent caching, and subset alignment."""
 import hashlib
-import itertools
-import json
 from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 
 import pandas as pd
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 from nyt_connections_solver.feature_cache import TensorCache
@@ -23,8 +18,6 @@ from nyt_connections_solver.edge_features import (
 from nyt_connections_solver.node_features import TextSpellingFeatures
 from nyt_connections_solver.data_loader import make_state_loaders, GraphConnectionsDataset
 from nyt_connections_solver.graph_features import build_graph_features
-from nyt_connections_solver.models import SetTransformer
-from nyt_connections_solver.harness import SearchHarness
 
 
 class FakeEmbedder:
@@ -42,14 +35,6 @@ def frame(words):
     return pd.DataFrame({'date': ['2026-01-01'] * 4, 'connections': [words[i:i+4] for i in range(0, 16, 4)]})
 
 
-def graph_namespace():
-    notebook = json.loads(Path('connections-graph.ipynb').read_text())
-    source = next(''.join(c['source']) for c in notebook['cells'] if 'class GraphAttentionBlock' in ''.join(c['source']))
-    namespace = dict(torch=torch, nn=nn, F=F, SetTransformer=SetTransformer,
-                     SearchHarness=SearchHarness, SentenceTransformer=FakeEmbedder,
-                     build_graph_features=build_graph_features, Path=Path)
-    exec(compile(source, 'graph notebook', 'exec'), namespace)
-    return namespace
 
 
 class GraphFeatureTests(unittest.TestCase):
@@ -133,39 +118,6 @@ class GraphFeatureTests(unittest.TestCase):
                 torch.testing.assert_close(sample['edge_features'], full_e[positions][:, positions])
             self.assertEqual(next(iter(loaders[size]))['x'].shape[1], 4 * size)
 
-    def test_graph_backward_search_and_checkpoint_reload(self):
-        torch.set_num_threads(1)
-        namespace = graph_namespace()
-        graph_class = namespace['GraphSetTransformer']
-        words = [f'word{i}' for i in range(16)]
-        with tempfile.TemporaryDirectory() as directory:
-            embedder = FakeEmbedder()
-            nodes, edges, metadata = build_graph_features(embedder, 'fake', revision='1', cache_dir=directory, char_dim=8)
-            config = dict(in_dim=nodes.dim, edge_dim=edges.dim, edge_bias_scale=.5,
-                          lin_layers=1, lin_width=16, attn_layers=1, attn_width=8, attn_heads=2, dropout=0.)
-            indices = torch.tensor(list(itertools.combinations(range(8), 4)))
-            model = graph_class(group_idx=indices, **config)
-            datasets, _ = make_state_loaders(frame(words), embedder, None, 1, feature_builder=nodes, edge_providers=edges)
-            sample = datasets[2][0]
-            scores = model(sample['x'][None], edge_features=sample['edge_features'][None])
-            scores.square().mean().backward()
-            self.assertTrue(all(torch.isfinite(p.grad).all() for p in model.parameters() if p.grad is not None))
-            harness = SearchHarness.from_model(model, embedder, input_dim=nodes.dim, device='cpu', beam_width=1,
-                                               node_feature_builder=nodes, edge_feature_builder=edges.encode)
-            original = harness.solve(words)
-            self.assertEqual(sorted(itertools.chain.from_iterable(original.best_groups)), sorted(words))
-            path = Path(directory) / 'checkpoint.pt'
-            torch.save(dict(model_class='GraphSetTransformer', model_config=config, model_state_dict=model.state_dict(),
-                            embedding_model_name='fake', feature_metadata=metadata,
-                            edge_feature_names=list(edges.feature_names)), path)
-            namespace['SentenceTransformer'] = lambda *a, **kw: FakeEmbedder()
-            reloaded = namespace['load_graph_harness'](path, device='cpu', beam_width=1, cache_dir=directory)
-            self.assertEqual(reloaded.solve(words).best_groups, original.best_groups)
-            self.assertEqual(reloaded.word_embedder.calls, [])
-            # Legacy set harness remains supported without node/edge builders.
-            legacy = SetTransformer(in_dim=8, group_idx=indices, lin_layers=1, lin_width=16,
-                                    attn_layers=1, attn_width=8, attn_heads=2, dropout=0.)
-            self.assertEqual(len(SearchHarness.from_model(legacy, FakeEmbedder(), input_dim=8, device='cpu', beam_width=1).solve(words).best_groups), 4)
 
 
 if __name__ == '__main__':

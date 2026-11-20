@@ -43,3 +43,16 @@ class EdgeFeatureProvider(Protocol):
         labels at inference time or mutate the supplied words.
         """
         ...
+
+
+class CandidateEdgeFeatureProvider(EdgeFeatureProvider, Protocol):
+    """Optional quartet-specific overrides for this provider's pairwise channels."""
+
+    def encode_candidates(self, words: Sequence[str], group_idx: Tensor) -> Tensor:
+        """Return finite [0,1] (candidates, provider_channels) values.
+
+        The graph model replaces each candidate's off-diagonal values in these
+        channels with its row. This permits exact witness consistency, which
+        cannot be reconstructed from pairwise scalar similarities alone.
+        """
+        ...

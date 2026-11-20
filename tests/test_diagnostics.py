@@ -1,6 +1,5 @@
 """Rank/pruning overlays, checkpoint loading, and real Streamlit interactions."""
 
-import ast
 import csv
 import json
 from pathlib import Path
@@ -22,7 +21,8 @@ from nyt_connections_solver.evaluation.diagnostics import (
 from nyt_connections_solver.evaluation import load_puzzles
 from nyt_connections_solver.feedback_search import FeedbackSearchHarness, ScoredGroup
 from nyt_connections_solver.game import LocalConnectionsEnvironment, Outcome
-from nyt_connections_solver.graph_models import GraphSetTransformer
+from nyt_connections_solver.graph_models import GraphSetTransformer, StandaloneCandidateGINE
+from nyt_connections_solver.checkpoints import load_graph_harness, register_graph_model, supports_graph_checkpoint
 from nyt_connections_solver.harness import SearchHarness
 from nyt_connections_solver.models import MultiheadAttentionBlock, SetDecoder, SetTransformer
 
@@ -31,11 +31,14 @@ WORDS = tuple("ABCDEFGHIJKLMNOP")
 GROUPS = tuple(WORDS[i:i + 4] for i in range(0, 16, 4))
 
 
-def tiny_harness():
+def tiny_harness(model_type=GraphSetTransformer):
     torch.manual_seed(0)
     config = dict(in_dim=4, edge_dim=1, edge_bias_scale=.5, lin_layers=1, lin_width=8,
                   attn_layers=1, attn_width=8, attn_heads=2, dropout=0.)
-    model = GraphSetTransformer(group_idx=torch.tensor([[0, 1, 2, 3]]), **config)
+    if model_type is StandaloneCandidateGINE:
+        config.update(edge_bias_scale=0., edge_hidden=8, gine_layers=1,
+                      train_text_projection=True, train_input_norm=True)
+    model = model_type(group_idx=torch.tensor([[0, 1, 2, 3]]), **config)
     def encode(words, **kwargs):
         return torch.tensor([[float(ord(w)), float(ord(w) % 7), 0., 1.] for w in words])
     nodes = SimpleNamespace(embeddings=SimpleNamespace(dim=4), encode=encode)
@@ -45,9 +48,9 @@ def tiny_harness():
         device="cpu", beam_width=1,
     )
     harness.checkpoint = dict(
-        model_class="GraphSetTransformer", model_config=config,
+        model_class=model_type.__name__, model_config=config,
         model_state_dict=model.state_dict(), embedding_model_name="fake",
-        feature_metadata={"options": {}}, edge_feature_names=["test_edge"],
+        feature_metadata={"options": {"revision": "test"}}, edge_feature_names=["test_edge"],
         split_dates={"val": ["2026-01-01"], "test": ["2026-01-01"]}, training_config={},
     )
     return harness
@@ -77,6 +80,56 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(points.shape, (16, 2))
         self.assertTrue(np.isfinite(points).all())
         self.assertEqual(variance, 0.)
+
+    def test_gine_uses_real_input_views_and_same_full_board_policy(self):
+        harness = tiny_harness(StandaloneCandidateGINE)
+        puzzle = SimpleNamespace(words=WORDS, groups=GROUPS, date="2026-01-01")
+        with patch.object(harness.model.full_encoder, 'forward', side_effect=AssertionError('Unused attention')):
+            session = DiagnosticSession(harness, puzzle, beam_width=1)
+            self.assertEqual(set(session.projections), {'Text embeddings', 'GINE input words'})
+            policy = FeedbackSearchHarness.from_harness(harness, beam_width=1, score_mode='full_board')
+            self.assertEqual(session.analyze().chosen, policy.choose(session.environment.observe()))
+            self.assertEqual(session.record().score_mode, 'full_board')
+
+    def test_registered_model_without_internal_encoder_or_diagnostic_hook(self):
+        from nyt_connections_solver.checkpoints import GRAPH_MODEL_TYPES
+
+        class OtherScorer(torch.nn.Module):
+            def __init__(self, group_idx, **config):
+                super().__init__()
+
+            def forward(self, x, group_idx=None, edge_features=None):
+                return x[:, group_idx, :].sum(dim=(-1, -2))
+
+        with patch.dict(GRAPH_MODEL_TYPES):
+            register_graph_model(OtherScorer)
+            harness = tiny_harness()
+            harness.model = OtherScorer(None)
+            harness.node_feature_builder = SimpleNamespace(encode=harness.node_feature_builder.encode)
+            harness.edge_feature_builder = None
+            session = DiagnosticSession(harness, SimpleNamespace(words=WORDS, groups=GROUPS, date='custom'), beam_width=1)
+            self.assertEqual(set(session.projections), {'Node features'})
+            self.assertEqual(session.edge_names, ())
+            self.assertIsNotNone(session.advance())
+            metadata = {**harness.checkpoint, 'model_class': 'OtherScorer'}
+            self.assertTrue(supports_graph_checkpoint(metadata))
+
+    def test_saved_gine_checkpoint_uses_shared_loader(self):
+        harness = tiny_harness(StandaloneCandidateGINE)
+        nodes = harness.node_feature_builder
+        nodes.dim = 4
+        edges = SimpleNamespace(dim=1, feature_names=['test_edge'], encode=harness.edge_feature_builder)
+        with tempfile.TemporaryDirectory() as directory:
+            weights = Path(directory) / 'arbitrary-name.pt'
+            torch.save(harness.checkpoint, weights)
+            with patch('nyt_connections_solver.checkpoints.SentenceTransformer', return_value=torch.nn.Identity()), \
+                 patch('nyt_connections_solver.checkpoints.build_graph_features',
+                       return_value=(nodes, edges, harness.checkpoint['feature_metadata'])):
+                loaded = load_graph_harness(weights, device='cpu', beam_width=1)
+            x, e = harness.encode_puzzle(WORDS)
+            with torch.inference_mode():
+                torch.testing.assert_close(harness.model(x[None], edge_features=e[None]),
+                                           loaded.model(x[None], edge_features=e[None]))
 
     def test_historical_colors_follow_csv_order_not_alphabetical_groups(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -119,33 +172,24 @@ class DiagnosticTests(unittest.TestCase):
         self.assertEqual(record.projections["Text embeddings"][0].shape, (16, 2))
         self.assertEqual(summarize_record(record)["guesses"], len(record.decisions))
 
-    def test_shared_graph_model_matches_notebook_weights_and_outputs(self):
-        notebook = json.loads((ROOT / "connections-prob-mass.ipynb").read_text())
-        source = next(''.join(c.get('source', [])) for c in notebook['cells']
-                      if 'class GraphAttentionBlock' in ''.join(c.get('source', [])))
-        definitions = [node for node in ast.parse(source).body if isinstance(node, ast.ClassDef)]
-        namespace = dict(torch=torch, nn=torch.nn, SetTransformer=SetTransformer,
-                         MultiheadAttentionBlock=MultiheadAttentionBlock, SetDecoder=SetDecoder)
-        exec(compile(ast.Module(body=definitions, type_ignores=[]), 'notebook model', 'exec'), namespace)
-        harness = tiny_harness()
-        original = namespace['GraphSetTransformer'](group_idx=torch.tensor([[0, 1, 2, 3]]),
-                                                   **harness.checkpoint['model_config']).eval()
-        original.load_state_dict(harness.model.state_dict())
-        x, edges = harness.encode_puzzle(WORDS)
-        with torch.inference_mode():
-            torch.testing.assert_close(harness.model(x[None], edge_features=edges[None]),
-                                       original(x[None], edge_features=edges[None]), rtol=0, atol=0)
 
 
 class StreamlitTests(unittest.TestCase):
     def test_load_step_finish_batch_and_replay(self):
+        self.exercise_app(GraphSetTransformer)
+
+    def test_gine_load_step_finish_batch_and_replay(self):
+        self.exercise_app(StandaloneCandidateGINE)
+
+    def exercise_app(self, model_type):
         from streamlit.testing.v1 import AppTest
 
         torch.set_num_threads(1)
-        harness = tiny_harness()
+        harness = tiny_harness(model_type)
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
-            weights = path / "graph_text_spelling_test.pt"
+            weights = path / "experiments" / "tuned-seed.pt"
+            weights.parent.mkdir()
             torch.save(harness.checkpoint, weights)
             dataset = path / "puzzles.csv"
             with dataset.open('w', newline='') as file:

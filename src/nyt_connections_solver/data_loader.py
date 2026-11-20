@@ -1,8 +1,31 @@
 """Set/graph datasets: prepare original boards once and slice true partial states."""
+import ast
 import itertools
+import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader, default_collate
 from .edge_features.composer import EdgeFeatureComposer
+from .candidate_features import slice_candidate_features
+
+
+def load_connections(path):
+    """Read the historical CSV using the baseline's existing data corrections.
+
+    Preserve row order (Purple, Blue, Green, Yellow). April 1 variant puzzles
+    were excluded from the baseline and remain excluded here.
+    """
+    frame = pd.read_csv(path, index_col=0)
+    for row, value in {
+        1298: "['line', 'plane', 'point', 'solid']",
+        1892: "['abyss', 'fly', 'matrix', 'thing']",
+    }.items():
+        if row in frame.index:
+            frame.loc[row, 'connections'] = value
+    frame = frame[~frame['date'].astype(str).str.contains('04-01')].copy()
+    frame['date'] = frame['date'].astype(str)
+    frame['connections'] = frame['connections'].apply(
+        lambda value: ast.literal_eval(value) if isinstance(value, str) else value)
+    return frame.reset_index(drop=True)
 
 
 def collate_keep_wordlists(batch):
@@ -34,6 +57,9 @@ class ConnectionsDataset(Dataset):
                     sample['x_char'] = board['x_char'][positions]
                 if 'edge_features' in board:
                     sample['edge_features'] = board['edge_features'][positions][:, positions]
+                if 'candidate_edge_features' in board:
+                    sample['candidate_edge_features'] = slice_candidate_features(
+                        board['candidate_edge_features'], positions, original_size=len(board['words']))
                 self.puzzle_list.append(sample)
 
     @staticmethod
@@ -56,6 +82,8 @@ class ConnectionsDataset(Dataset):
                 board['x_char'] = torch.as_tensor(char_vectorizer.transform(words).toarray())
             if edge_builder is not None:
                 board['edge_features'] = edge_builder.encode(words)
+                if edge_builder.candidate_feature_channels:
+                    board['candidate_edge_features'] = edge_builder.encode_candidates(words)
             boards.append(board)
         return boards
 
