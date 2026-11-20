@@ -1,0 +1,530 @@
+{
+  "scope": "Historical runners and experiment tests; not runtime dependencies",
+  "moved": [
+    {
+      "original": "scripts/audit_connection_mechanisms.py",
+      "archived": "archive/research/scripts/audit_connection_mechanisms.py",
+      "sha256": "1a527cf827dcbaba7aaa5646bab615b34ee211d1cbd74f70231e8e8695651577"
+    },
+    {
+      "original": "scripts/audit_fragment_predictions.py",
+      "archived": "archive/research/scripts/audit_fragment_predictions.py",
+      "sha256": "79581c3b4cb43bad564d748e79740414cd6998ba853721566da65e21d4b06ca4"
+    },
+    {
+      "original": "scripts/audit_gine_probability_floor.py",
+      "archived": "archive/research/scripts/audit_gine_probability_floor.py",
+      "sha256": "76149561dbef7c6e7709e95aa6a0247fc9132ff39ae79b039cb74711e35a69be"
+    },
+    {
+      "original": "scripts/audit_gine_v1.py",
+      "archived": "archive/research/scripts/audit_gine_v1.py",
+      "sha256": "9818fe8130b5a15c58e093da605b1cf3b6d3b7fb5f61a0292ea00d99fc13e7d7"
+    },
+    {
+      "original": "scripts/audit_graph_edge_coverage.py",
+      "archived": "archive/research/scripts/audit_graph_edge_coverage.py",
+      "sha256": "8fabcc5fce9064ff334fb596e6d14d436899847e008dcb639315254c76304c3e"
+    },
+    {
+      "original": "scripts/audit_group_mechanisms.py",
+      "archived": "archive/research/scripts/audit_group_mechanisms.py",
+      "sha256": "a5cd6fd7372354490614f2ad5ed1fcd86805d224d6a40108064fcbd44bf63030"
+    },
+    {
+      "original": "scripts/audit_letter_edit_coverage.py",
+      "archived": "archive/research/scripts/audit_letter_edit_coverage.py",
+      "sha256": "ba962425b41cb2fc9ba8df0c30eb8e567f4737d1c878be29dae547097aeea3ab"
+    },
+    {
+      "original": "scripts/audit_phonetic_coverage.py",
+      "archived": "archive/research/scripts/audit_phonetic_coverage.py",
+      "sha256": "e04f9b2194ac2a68ce87006632e7b54e78b84c4a87f28a9ca7cb0757aee404d5"
+    },
+    {
+      "original": "scripts/audit_phonetic_group_ranks.py",
+      "archived": "archive/research/scripts/audit_phonetic_group_ranks.py",
+      "sha256": "565476afc73220576b57ce0ac9604fa62273396a8b70bdedb9b37cbbf9f2f8ed"
+    },
+    {
+      "original": "scripts/audit_relation_checkpoints.py",
+      "archived": "archive/research/scripts/audit_relation_checkpoints.py",
+      "sha256": "18dafeaf52bad6ee3481b5e30ed56cee8315f3af87ce201b2af2ceabe1446a5d"
+    },
+    {
+      "original": "scripts/audit_relation_witnesses.py",
+      "archived": "archive/research/scripts/audit_relation_witnesses.py",
+      "sha256": "258f4b976d4fe011f0647f57813771aa1089125358491ce492e993fbb5f17caa"
+    },
+    {
+      "original": "scripts/audit_transformation_coverage.py",
+      "archived": "archive/research/scripts/audit_transformation_coverage.py",
+      "sha256": "8bd50e83be5faeb05c8607ddbab455c72a3eeacbd270f4c8642354045cde1ac1"
+    },
+    {
+      "original": "scripts/audit_wiktionary_filters.py",
+      "archived": "archive/research/scripts/audit_wiktionary_filters.py",
+      "sha256": "56a33bf7a0f312e9fc65f562dcadba8ed6d5cb07fa9e5a3af0e3f215644cbdd5"
+    },
+    {
+      "original": "scripts/audit_wiktionary_phrases.py",
+      "archived": "archive/research/scripts/audit_wiktionary_phrases.py",
+      "sha256": "a997caf2b479796411bb6c18cbb6a39a9173889a059cf255eca3f58ae83b5961"
+    },
+    {
+      "original": "scripts/benchmark_gine_transformations.py",
+      "archived": "archive/research/scripts/benchmark_gine_transformations.py",
+      "sha256": "f13bc1a07423a66a170d3687e2e80a91bcee72976f3b254f45ba2725b0f8c0d8"
+    },
+    {
+      "original": "scripts/compare_relation_coherence.py",
+      "archived": "archive/research/scripts/compare_relation_coherence.py",
+      "sha256": "15aaca149272bd9a967d878f2374b5d2a4d169f1ec9a3118326f2242976a8fbd"
+    },
+    {
+      "original": "scripts/evaluate.py",
+      "archived": "archive/research/scripts/evaluate.py",
+      "sha256": "d9108807f097257cbfd898311143b637d554518bb68fdb46ee251722b6837ed2"
+    },
+    {
+      "original": "scripts/evaluate_gine_tuning_test.py",
+      "archived": "archive/research/scripts/evaluate_gine_tuning_test.py",
+      "sha256": "1763547798ff941ec4c5142d080d85809e724eb63037ee222d5e1b45bc7b983f"
+    },
+    {
+      "original": "scripts/fragment_states.py",
+      "archived": "archive/research/scripts/fragment_states.py",
+      "sha256": "64d6b963b02831111425a864b79ef46c21f5ba589ec90e4833fb831a47406e05"
+    },
+    {
+      "original": "scripts/graph_auxiliary_loss.py",
+      "archived": "archive/research/scripts/graph_auxiliary_loss.py",
+      "sha256": "320e3e0c30634880e723e50a07683c4b5eab5a924fb16a3b730f928a1bf73d02"
+    },
+    {
+      "original": "scripts/graph_group_loss.py",
+      "archived": "archive/research/scripts/graph_group_loss.py",
+      "sha256": "8b092cf16fd3eadc1d64500671f8c910bbf0822d4e40904dcf4f04ff94e21196"
+    },
+    {
+      "original": "scripts/graph_training_probe.py",
+      "archived": "archive/research/scripts/graph_training_probe.py",
+      "sha256": "1a1622782c92506ffa674f2f63ac7aa3506e932779748580863d19ae1cd94a92"
+    },
+    {
+      "original": "scripts/graph_training_schedule.py",
+      "archived": "archive/research/scripts/graph_training_schedule.py",
+      "sha256": "266627c9a6f4281f15ba957eec07b3a7450c37beb03464d992f0bbdc389cd838"
+    },
+    {
+      "original": "scripts/group_mechanisms.py",
+      "archived": "archive/research/scripts/group_mechanisms.py",
+      "sha256": "9c40f4521eab31a89b8e05955660927ddce1bedeaf09de82a6472045f140a7db"
+    },
+    {
+      "original": "scripts/refit_gine_v1.py",
+      "archived": "archive/research/scripts/refit_gine_v1.py",
+      "sha256": "12999ffdde0ff325f665022af87ac521d3a90186d64d2ec80eaf335f03ccfae5"
+    },
+    {
+      "original": "scripts/run_gine_candidate_curriculum.py",
+      "archived": "archive/research/scripts/run_gine_candidate_curriculum.py",
+      "sha256": "51cb32cded5f601556df6a968b4ab13a7ce528fdaa39e4cd92dcb210664ef615"
+    },
+    {
+      "original": "scripts/run_gine_curriculum.py",
+      "archived": "archive/research/scripts/run_gine_curriculum.py",
+      "sha256": "13900dd58c01bc0f6e7e859ed1c65937c791cedbfce51434fc3f8e3e2a5dd3d6"
+    },
+    {
+      "original": "scripts/run_gine_edge_coherence.py",
+      "archived": "archive/research/scripts/run_gine_edge_coherence.py",
+      "sha256": "6aaf3ac7e447dce8c95a90bdd5f267f11c4e1b4f76904126ee1f9c96ff98f35b"
+    },
+    {
+      "original": "scripts/run_gine_floor_replication.py",
+      "archived": "archive/research/scripts/run_gine_floor_replication.py",
+      "sha256": "34c82a006c027e6e0fe7cc68ee639c19dbe5834f043508d7c1a3fffd5ac11387"
+    },
+    {
+      "original": "scripts/run_gine_fragment_states.py",
+      "archived": "archive/research/scripts/run_gine_fragment_states.py",
+      "sha256": "42137a643f8527d1d09a1b46e4fdc1afe2560149b49adfb9b3e60b5699bfb12b"
+    },
+    {
+      "original": "scripts/run_gine_group_contrastive.py",
+      "archived": "archive/research/scripts/run_gine_group_contrastive.py",
+      "sha256": "33e86027d68335bf224bca006b4dce6096e8caa22468a169cf8bea81c0d9330b"
+    },
+    {
+      "original": "scripts/run_gine_original_only.py",
+      "archived": "archive/research/scripts/run_gine_original_only.py",
+      "sha256": "c9a728e47bbc771624e90022a5944bca48c5331539819a47e30acb0c2c877807"
+    },
+    {
+      "original": "scripts/run_gine_probability_floor.py",
+      "archived": "archive/research/scripts/run_gine_probability_floor.py",
+      "sha256": "344f23056b669086f532fa8bd1fc1b223755299fc5732793ae38ff7e8271e33e"
+    },
+    {
+      "original": "scripts/run_gine_relation_witnesses.py",
+      "archived": "archive/research/scripts/run_gine_relation_witnesses.py",
+      "sha256": "69bca8e6b11b42a0cba4063b3367e2d2fbf05d1c4cca3a5b17fc9922ec20e8f6"
+    },
+    {
+      "original": "scripts/run_gine_sparse.py",
+      "archived": "archive/research/scripts/run_gine_sparse.py",
+      "sha256": "cd007a3604d7ceb04b80e3cbeccd17823affa23428ae74912285925fc4315f25"
+    },
+    {
+      "original": "scripts/run_gine_transformation_capacity.py",
+      "archived": "archive/research/scripts/run_gine_transformation_capacity.py",
+      "sha256": "0a286af76d7d2ba7210f74ea8ce065e608ec98ef8931e7ee7c70841dcbc2fbcc"
+    },
+    {
+      "original": "scripts/run_gine_transformations.py",
+      "archived": "archive/research/scripts/run_gine_transformations.py",
+      "sha256": "0bfd3501e90fb0dda791a473bab90a9542db5b9e7f0c327fd3a5a6c97fae7ae3"
+    },
+    {
+      "original": "scripts/run_gine_two_stage.py",
+      "archived": "archive/research/scripts/run_gine_two_stage.py",
+      "sha256": "5d0be669da3c40f73f760d586ea887d1994cca4f5f358a25394bf8768e164437"
+    },
+    {
+      "original": "scripts/run_graph_feature_experiment.py",
+      "archived": "archive/research/scripts/run_graph_feature_experiment.py",
+      "sha256": "7d51d24ef3087b83b9b5e3907772d5072b5c03b669b7f1acf341ed1d8c4a6d3a"
+    },
+    {
+      "original": "scripts/run_letter_edit_experiment.py",
+      "archived": "archive/research/scripts/run_letter_edit_experiment.py",
+      "sha256": "1b39368241eb4196bde437a2cab0d504966d4f6ff4555e408dbe69f34f2c2c9e"
+    },
+    {
+      "original": "scripts/run_phonetic_experiment.py",
+      "archived": "archive/research/scripts/run_phonetic_experiment.py",
+      "sha256": "ebbf505fc1121aa95704b3594dc7736ab4088a215cd20cb27bc4ad0649bd384c"
+    },
+    {
+      "original": "scripts/run_phonetic_fusion_experiment.py",
+      "archived": "archive/research/scripts/run_phonetic_fusion_experiment.py",
+      "sha256": "56154215935d796c0a8110f674074c5d7d3f6052c746c2e4cf7fc69ecec797bc"
+    },
+    {
+      "original": "scripts/summarize_gine_candidate_curriculum.py",
+      "archived": "archive/research/scripts/summarize_gine_candidate_curriculum.py",
+      "sha256": "95379deff9cd7f75cb062154dc51365fd399a984304894e942eb1e9ee8052856"
+    },
+    {
+      "original": "scripts/summarize_gine_coherence_cv.py",
+      "archived": "archive/research/scripts/summarize_gine_coherence_cv.py",
+      "sha256": "12f480c4347eeb13dee4a128e1a57008b46078a5c9cd6617ac09f3efe3b32d58"
+    },
+    {
+      "original": "scripts/summarize_gine_curriculum.py",
+      "archived": "archive/research/scripts/summarize_gine_curriculum.py",
+      "sha256": "778583139d07b03c0d294d5cf5fd18d9894b6753ed91d50fd0c19dd8865d7d8b"
+    },
+    {
+      "original": "scripts/summarize_gine_edge_coherence.py",
+      "archived": "archive/research/scripts/summarize_gine_edge_coherence.py",
+      "sha256": "186e7a045fd335293a7be7ef2ae59103a39ff5d659ed6aa3bf9007c6a2be30f2"
+    },
+    {
+      "original": "scripts/summarize_gine_edge_summary.py",
+      "archived": "archive/research/scripts/summarize_gine_edge_summary.py",
+      "sha256": "fedd33def0458e0ec8d2f36a76b24c3cc2bc8fced297b476e8337750a5371fa3"
+    },
+    {
+      "original": "scripts/summarize_gine_floor_replication.py",
+      "archived": "archive/research/scripts/summarize_gine_floor_replication.py",
+      "sha256": "4858a456097f7f738a9cac28eedd344dc17dc99d15af9fe269f944cab3653bc1"
+    },
+    {
+      "original": "scripts/summarize_gine_floor_tuning.py",
+      "archived": "archive/research/scripts/summarize_gine_floor_tuning.py",
+      "sha256": "02128489c123863c3b61882eb5afe24b694c1ad400229264a86c1f0c51d7f7df"
+    },
+    {
+      "original": "scripts/summarize_gine_fragment_states.py",
+      "archived": "archive/research/scripts/summarize_gine_fragment_states.py",
+      "sha256": "e68d25b3ebdf7c730076d89b2ed123edc27b46572f7c140b8c885b90a742ae09"
+    },
+    {
+      "original": "scripts/summarize_gine_group_contrastive.py",
+      "archived": "archive/research/scripts/summarize_gine_group_contrastive.py",
+      "sha256": "aa384842f47c9f9e087e41acca24c0864ffb5994a8b3c8ce084ba76742b49819"
+    },
+    {
+      "original": "scripts/summarize_gine_original_only.py",
+      "archived": "archive/research/scripts/summarize_gine_original_only.py",
+      "sha256": "28cc168209137d3bd42820e96f4517bfbaa66705bf17ec49eebe9bb2742af3fc"
+    },
+    {
+      "original": "scripts/summarize_gine_probability_floor.py",
+      "archived": "archive/research/scripts/summarize_gine_probability_floor.py",
+      "sha256": "d7bd9cdd9586641ad300d62521f1820a6ea109b6356393fea1ade59b6e94e56d"
+    },
+    {
+      "original": "scripts/summarize_gine_relation_witnesses.py",
+      "archived": "archive/research/scripts/summarize_gine_relation_witnesses.py",
+      "sha256": "7a2b2591f69768b627ad23738e3e982fa4aff91e6e5180a39cafba6f5bee9781"
+    },
+    {
+      "original": "scripts/summarize_gine_sparse.py",
+      "archived": "archive/research/scripts/summarize_gine_sparse.py",
+      "sha256": "5bf4652403c83f13ac7390e84f914c36a972d58ae584ab2d73ad77e0d559d502"
+    },
+    {
+      "original": "scripts/summarize_gine_stability.py",
+      "archived": "archive/research/scripts/summarize_gine_stability.py",
+      "sha256": "45a961b8a1ad06954f5fecee9c34eb712ada96423feedc8d1de1d5be71d6f13b"
+    },
+    {
+      "original": "scripts/summarize_gine_transformation_capacity.py",
+      "archived": "archive/research/scripts/summarize_gine_transformation_capacity.py",
+      "sha256": "7cdf24d2f101910dd32b1c6d65567a8e4f6e73768bb495c5a3a59638c870c2a6"
+    },
+    {
+      "original": "scripts/summarize_gine_transformation_tuning.py",
+      "archived": "archive/research/scripts/summarize_gine_transformation_tuning.py",
+      "sha256": "fbd89f69e1c51db69489cc8be885f52874432c5b5a62176b87ab3852b6a42cb0"
+    },
+    {
+      "original": "scripts/summarize_gine_transformations.py",
+      "archived": "archive/research/scripts/summarize_gine_transformations.py",
+      "sha256": "3a160d65eb484bd5e17b5078e354dff528d30b3c0b4347dd6e2e68b569e3cca8"
+    },
+    {
+      "original": "scripts/summarize_gine_tuning.py",
+      "archived": "archive/research/scripts/summarize_gine_tuning.py",
+      "sha256": "f01ff6b34b1ef137e7a6a1bb862a72f1f0a5e67857b59c130d63a33e14f15a02"
+    },
+    {
+      "original": "scripts/summarize_gine_two_stage.py",
+      "archived": "archive/research/scripts/summarize_gine_two_stage.py",
+      "sha256": "558550acb66e567468f81048b10ff2d01d2eaca4d00e351bbc316c316fccf284"
+    },
+    {
+      "original": "scripts/summarize_gradient_diagnosis.py",
+      "archived": "archive/research/scripts/summarize_gradient_diagnosis.py",
+      "sha256": "2cd82c87ff0f63907bfbc05553204bb01d973810c4dd61f0a98dbaf26c04073b"
+    },
+    {
+      "original": "scripts/summarize_group_mechanism_audit.py",
+      "archived": "archive/research/scripts/summarize_group_mechanism_audit.py",
+      "sha256": "7f3fffe736e62d9140069c17be46ae54fd0517c5b08213a7093d87506e78fd46"
+    },
+    {
+      "original": "scripts/summarize_letter_edit_experiment.py",
+      "archived": "archive/research/scripts/summarize_letter_edit_experiment.py",
+      "sha256": "9bf27f8d6a1d57489e3def648e081da7e3d57acc72c9dc3c3babf3402a1a8833"
+    },
+    {
+      "original": "scripts/summarize_long_gine_training.py",
+      "archived": "archive/research/scripts/summarize_long_gine_training.py",
+      "sha256": "ec14343ca2bf5789b185648e51650623a75feab4e83e735fa0582403267c9b1a"
+    },
+    {
+      "original": "scripts/summarize_phonetic_experiment.py",
+      "archived": "archive/research/scripts/summarize_phonetic_experiment.py",
+      "sha256": "b08eb2502d0934b4d840825dfd05f4419b5bf310c757fcacfa7fa6daed062dab"
+    },
+    {
+      "original": "scripts/summarize_phonetic_fusion.py",
+      "archived": "archive/research/scripts/summarize_phonetic_fusion.py",
+      "sha256": "28ab3d958cc9f068d699da4478424903aff69591776031eec05d2cdde02ca7f2"
+    },
+    {
+      "original": "scripts/tune_gine.py",
+      "archived": "archive/research/scripts/tune_gine.py",
+      "sha256": "a7534d9dca2c6f3717332d057282a6fb9a7affebecce03909ab61aa43abaa63f"
+    },
+    {
+      "original": "scripts/tune_gine_coherence_cv.py",
+      "archived": "archive/research/scripts/tune_gine_coherence_cv.py",
+      "sha256": "a9eba98395e58fd41555d69392788c504d4318688d61013b38e7d678203f11b9"
+    },
+    {
+      "original": "scripts/tune_gine_probability_floor.py",
+      "archived": "archive/research/scripts/tune_gine_probability_floor.py",
+      "sha256": "823cc32b1e4527d52a46c581dd5def29e9613aaffe6787215f684743822ddc51"
+    },
+    {
+      "original": "scripts/tune_gine_transformations.py",
+      "archived": "archive/research/scripts/tune_gine_transformations.py",
+      "sha256": "9b7962adbb84529709a5fdd2abf270504ab73783e3fe9331896063aa8429ce2b"
+    },
+    {
+      "original": "scripts/wordnet_overlap.py",
+      "archived": "archive/research/scripts/wordnet_overlap.py",
+      "sha256": "a693cf9ea73e03bbe39c789be31679dcc9b91c532ebd350ef6e415264fec421c"
+    },
+    {
+      "original": "tests/test_additive_gine.py",
+      "archived": "archive/research/tests/test_additive_gine.py",
+      "sha256": "9f1f1a41fd21f48afba999c9fcaffa2e28bcd9df2f809c1ae100b3ff68dbb565"
+    },
+    {
+      "original": "tests/test_candidate_curriculum.py",
+      "archived": "archive/research/tests/test_candidate_curriculum.py",
+      "sha256": "c4e2d9074f488355879793ef3be8a950acc86ced1b5dc34b0efb7a622984f4a0"
+    },
+    {
+      "original": "tests/test_conditioned_wordnet.py",
+      "archived": "archive/research/tests/test_conditioned_wordnet.py",
+      "sha256": "a89d5d2706ce01e9bfe7b5abac4c78ea8f79873eafeb1c729fc0b0e4980fe6bd"
+    },
+    {
+      "original": "tests/test_edge_coherence.py",
+      "archived": "archive/research/tests/test_edge_coherence.py",
+      "sha256": "b0db9c1959f0036d05fa5e5d1e2d9d736b9803283e2d5113680573b1a07d7ac1"
+    },
+    {
+      "original": "tests/test_edge_coverage_audit.py",
+      "archived": "archive/research/tests/test_edge_coverage_audit.py",
+      "sha256": "9a8adc1dd4f78b70a6269292f16aad6e7d605e679af758ed152e61552c2793f8"
+    },
+    {
+      "original": "tests/test_edge_summary.py",
+      "archived": "archive/research/tests/test_edge_summary.py",
+      "sha256": "8696b04e16da0672a60a44e13056f284521086ab249b132837005f1347179dbe"
+    },
+    {
+      "original": "tests/test_encoder_annealing.py",
+      "archived": "archive/research/tests/test_encoder_annealing.py",
+      "sha256": "5495a7947b65f6b903a34cc74451c9e6656e59c6f64c07af6d1ef14def516927"
+    },
+    {
+      "original": "tests/test_experiment_color_metrics.py",
+      "archived": "archive/research/tests/test_experiment_color_metrics.py",
+      "sha256": "847642b23438cee867874fa37a7be3fd4bb6acf6e8605f858020105b5c286187"
+    },
+    {
+      "original": "tests/test_floor_tuning.py",
+      "archived": "archive/research/tests/test_floor_tuning.py",
+      "sha256": "b759b7ff8485931d825f8628d080e08b00607f1fd749a58dd8e470d3b1577b10"
+    },
+    {
+      "original": "tests/test_fragment_states.py",
+      "archived": "archive/research/tests/test_fragment_states.py",
+      "sha256": "1719de2249f5b02ee6c54ef6bd8339c5f3d76929be5331e615514d3bf9404fd2"
+    },
+    {
+      "original": "tests/test_gated_edge_residual.py",
+      "archived": "archive/research/tests/test_gated_edge_residual.py",
+      "sha256": "74c67864ddf322311a5b663bdbd71b6dbb9d97a0ae3f48e463650ca7472b4061"
+    },
+    {
+      "original": "tests/test_gine_coherence_cv.py",
+      "archived": "archive/research/tests/test_gine_coherence_cv.py",
+      "sha256": "d834b13b24775986b270d01cecd1fc77f61c31bfe6500261658c003c37dbd954"
+    },
+    {
+      "original": "tests/test_gine_curriculum.py",
+      "archived": "archive/research/tests/test_gine_curriculum.py",
+      "sha256": "53abf9ef6bc5f93f3e6c1b32a44194b7d34534ea6087dbcf40ea6bc27b0401d2"
+    },
+    {
+      "original": "tests/test_gine_hyperparams.py",
+      "archived": "archive/research/tests/test_gine_hyperparams.py",
+      "sha256": "fb089aba8933b038de558f2f0926844a2dd3a5a3acfff50712b859733b234924"
+    },
+    {
+      "original": "tests/test_gine_residual.py",
+      "archived": "archive/research/tests/test_gine_residual.py",
+      "sha256": "4edacf811ce500f0e327f59478b3a8f7ac24a0ac597093759375f963f346df56"
+    },
+    {
+      "original": "tests/test_graph_auxiliary_loss.py",
+      "archived": "archive/research/tests/test_graph_auxiliary_loss.py",
+      "sha256": "06ec7700a2b16b0c3a79bafdd3ce6b71606b904fb6ab8bae215ab69b4bc5d7ab"
+    },
+    {
+      "original": "tests/test_graph_tuning.py",
+      "archived": "archive/research/tests/test_graph_tuning.py",
+      "sha256": "e71c8f45e685d8c3a7f9142e39c68c5f33cfa88b74ec29abc64cc9fe6713023e"
+    },
+    {
+      "original": "tests/test_group_contrastive_loss.py",
+      "archived": "archive/research/tests/test_group_contrastive_loss.py",
+      "sha256": "4618e89cc4185dd8f00ebf5feaea303cccba141479dd84117a793ba577ddcb91"
+    },
+    {
+      "original": "tests/test_group_mechanism_audit.py",
+      "archived": "archive/research/tests/test_group_mechanism_audit.py",
+      "sha256": "d25438e58b1d226bcc000b494cd69e7059b52dc61a00418341f3a31165258eb8"
+    },
+    {
+      "original": "tests/test_letter_edits.py",
+      "archived": "archive/research/tests/test_letter_edits.py",
+      "sha256": "3fa080de5b4dc0065fe908eca62855b2c60e51b06c102d7aad6f08e2d6ef6229"
+    },
+    {
+      "original": "tests/test_partition.py",
+      "archived": "archive/research/tests/test_partition.py",
+      "sha256": "816dc9153dddd25860143188bbd07863802a242e84697deb2147453aa2e6adcd"
+    },
+    {
+      "original": "tests/test_phonetic_fusion.py",
+      "archived": "archive/research/tests/test_phonetic_fusion.py",
+      "sha256": "644b698e657a4f275927ec73ac58784c5a2504066de581ca7c9df3990092e12a"
+    },
+    {
+      "original": "tests/test_phrase_lexicon.py",
+      "archived": "archive/research/tests/test_phrase_lexicon.py",
+      "sha256": "feb1355471e0870aa1b95e58d42d9cb71b42ca0be2094db0a4559b0a6eda07fb"
+    },
+    {
+      "original": "tests/test_pronunciation_edges.py",
+      "archived": "archive/research/tests/test_pronunciation_edges.py",
+      "sha256": "785ad9adfe10f4dc7ef6db6a7b0f6382ce408508637059d8c0c00a7474cf33a4"
+    },
+    {
+      "original": "tests/test_relation_witnesses.py",
+      "archived": "archive/research/tests/test_relation_witnesses.py",
+      "sha256": "003b3e65eac27a8224be2f974a475514e624f0e62ec36a99ac76e6224f1b9259"
+    },
+    {
+      "original": "tests/test_sparse_gine.py",
+      "archived": "archive/research/tests/test_sparse_gine.py",
+      "sha256": "234bfe283a74420316635be1d089879b4a00733fef1b1f9db74dd0dae8853073"
+    },
+    {
+      "original": "tests/test_specific_phrase_features.py",
+      "archived": "archive/research/tests/test_specific_phrase_features.py",
+      "sha256": "85620d3d38ea7c8f552315a81f9e10b057ef5ccfb428ec031baa3584bc159358"
+    },
+    {
+      "original": "tests/test_training_probe.py",
+      "archived": "archive/research/tests/test_training_probe.py",
+      "sha256": "199f65aec78953b718a6cc72482f685953d893a9a12f8e63202bc5c81cf84b33"
+    },
+    {
+      "original": "tests/test_transformations.py",
+      "archived": "archive/research/tests/test_transformations.py",
+      "sha256": "9d0df3f3cad5bb1efd0a494df7a240bb2b2135dc98a1c0713cba7d078546aedf"
+    },
+    {
+      "original": "tests/test_v1_refit.py",
+      "archived": "archive/research/tests/test_v1_refit.py",
+      "sha256": "76058bb9c43a621cff0283d0b79f624c76c324adca64cb464f2be1726c9c5328"
+    },
+    {
+      "original": "tests/test_wiktionary_filters.py",
+      "archived": "archive/research/tests/test_wiktionary_filters.py",
+      "sha256": "4678c10f8dd0b0b380da95202a4f59f9ab66946613346856f99a90b885aaca54"
+    },
+    {
+      "original": "tests/test_wordnet_mixer.py",
+      "archived": "archive/research/tests/test_wordnet_mixer.py",
+      "sha256": "2b7a54d7d3e58c190ad6bf1e3f68819f9bf0ba2e78ebc39ab12fab650fb1c8ac"
+    }
+  ],
+  "test_snapshots": [
+    "tests/test_diagnostics.py",
+    "tests/test_graph_features.py",
+    "tests/test_probability_floor_loss.py"
+  ]
+}

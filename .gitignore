@@ -16,6 +16,10 @@ runs/
 pretrained/
 weights/
 
+# Local research outputs. Portable reports and the experiment manifest live in
+# notes/experiments/; refresh with scripts/export_experiment_notes.py.
+/experiments/
+
 # direnv
 .direnv/
 .envrc

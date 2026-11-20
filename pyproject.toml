@@ -28,6 +28,10 @@ dependencies = [
 # This is an application/notebook project; src is added to sys.path by the notebook.
 package = false
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["archive", "experiments", ".venv", "data", "weights"]
+
 [[tool.uv.index]]
 name = "pytorch-cuda"
 url = "https://download.pytorch.org/whl/cu128"
