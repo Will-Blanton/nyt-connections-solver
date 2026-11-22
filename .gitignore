@@ -3,6 +3,7 @@
 venv/
 __pycache__/
 *.pyc
+*.egg-info
 
 # IDE
 .idea/
@@ -13,6 +14,11 @@ __pycache__/
 data/
 runs/
 pretrained/
+weights/
+
+# Local research outputs. Portable reports and the experiment manifest live in
+# notes/experiments/; refresh with scripts/export_experiment_notes.py.
+/experiments/
 
 # direnv
 .direnv/

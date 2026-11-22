@@ -1,0 +1,507 @@
+{
+  "schema_version": 1,
+  "exported_at_utc": "2026-11-20T18:25:42.698047+00:00",
+  "scope": "Markdown report snapshots, not an inventory of every optimizer trial or raw run",
+  "raw_artifacts": "experiments/ (ignored; research machine only)",
+  "report_count": 61,
+  "selected_baseline": {
+    "winner": "cv",
+    "primary_seed": 10,
+    "checkpoint": "weights/experiments/20261107T055124Z-v1-refit-cv-seed-10.pt",
+    "criterion": "aggregate test solves; then first guesses correct; then s4 Hit@1; final tie CV",
+    "test_used_for_setup_selection": true,
+    "checkpoint_sha256": "fc43e5af84a35f6d032495b5d224b0f4cdf4647bd11c7d91bdc86c62d64b8898",
+    "cv_selection_record": {
+      "trial": 13,
+      "mean_hit1": 0.4003762736227962,
+      "params": {
+        "hidden_width": 64,
+        "gine_layers": 3,
+        "readout_width": 64,
+        "projection_width": 256,
+        "dropout": 0.0,
+        "lr": 0.0009802617130802425,
+        "weight_decay": 0.005032124249909019
+      },
+      "fold_results": [
+        "experiments/gine-coherence-cv/baseline/trial-13/fold-0.json",
+        "experiments/gine-coherence-cv/baseline/trial-13/fold-1.json",
+        "experiments/gine-coherence-cv/baseline/trial-13/fold-2.json",
+        "experiments/gine-coherence-cv/baseline/trial-13/fold-3.json",
+        "experiments/gine-coherence-cv/baseline/trial-13/fold-4.json"
+      ]
+    },
+    "refit_report": "reports/gine-v1-refit/report.md",
+    "model_config": {
+      "edge_dim": 15,
+      "edge_bias_scale": 0.0,
+      "in_dim": 1024,
+      "lin_layers": 2,
+      "lin_width": 512,
+      "attn_layers": 1,
+      "attn_width": 256,
+      "attn_heads": 8,
+      "dropout": 0.0,
+      "edge_hidden": 64,
+      "gine_layers": 3,
+      "readout_width": 64,
+      "projection_width": 256,
+      "gine_dropout": 0.0,
+      "edge_coherence_scale": 0.0,
+      "train_text_projection": true,
+      "train_input_norm": true
+    },
+    "fixed_refit_updates": 1878,
+    "training_puzzles": 1089,
+    "test_puzzles": 121,
+    "batch_size": 16,
+    "loss": {
+      "loss": "probability_mass_with_floor",
+      "floor_weight": 0.1,
+      "floor_beta": 0.1
+    },
+    "primary_checkpoint_test_solves": 22,
+    "primary_checkpoint_test_hit1": 0.3305785123966942,
+    "harness": {
+      "beam_width": 20,
+      "score_mode": "full_board",
+      "max_mistakes": 4,
+      "shuffle_seed": 0
+    }
+  },
+  "known_incomplete_studies": [
+    {
+      "report": "reports/gine-transformation-capacity.md",
+      "status": "interrupted; report is a historical progress snapshot, not a completed result"
+    }
+  ],
+  "reports": [
+    {
+      "title": "Production baseline full-run verification (2026-11-20)",
+      "local_source": "experiments/baseline-verification-20261120/report.md",
+      "snapshot": "reports/baseline-verification-20261120/report.md",
+      "sha256": "dde489d5aa20ef7d035b9d926ee80fb7b2f140216a86880521a2bfd26e42497c",
+      "bytes": 4032
+    },
+    {
+      "title": "Validation group-mechanism inventory",
+      "local_source": "experiments/connection-mechanism-gaps.md",
+      "snapshot": "reports/connection-mechanism-gaps.md",
+      "sha256": "03011abdd37443e7e43a187e439d618d6a71aeaab190c5d50f9fca459e9d7f2b",
+      "bytes": 7064
+    },
+    {
+      "title": "Existing edge feature coverage",
+      "local_source": "experiments/edge-coverage/coverage.md",
+      "snapshot": "reports/edge-coverage/coverage.md",
+      "sha256": "f5df4d44ee5f32183c029b85565bbc21c53193bb2206f23a542dd5ed9bbf6238",
+      "bytes": 4167
+    },
+    {
+      "title": "Existing edge feature coverage",
+      "local_source": "experiments/edge-coverage-projected/coverage.md",
+      "snapshot": "reports/edge-coverage-projected/coverage.md",
+      "sha256": "2240aeab1662fe992f420338fcef44ea78c5bd2eb16d14c87d7bee218fed233b",
+      "bytes": 5504
+    },
+    {
+      "title": "Fade the contrastive auxiliary loss out early",
+      "local_source": "experiments/gine-auxiliary-annealing.md",
+      "snapshot": "reports/gine-auxiliary-annealing.md",
+      "sha256": "ee4067f40b83e8469305165b1b8b6d54c7e481d14aadda5e51284900fce34181",
+      "bytes": 3128
+    },
+    {
+      "title": "Puzzle-local contrastive auxiliary objective",
+      "local_source": "experiments/gine-auxiliary-contrastive.md",
+      "snapshot": "reports/gine-auxiliary-contrastive.md",
+      "sha256": "6422ef70a4763fb660993e30ba7a632c0ab36f813628dcc75d224a32dc41fe5d",
+      "bytes": 4797
+    },
+    {
+      "title": "GINE training budget and nonlinear edge encoding",
+      "local_source": "experiments/gine-budget-and-edge-encoder.md",
+      "snapshot": "reports/gine-budget-and-edge-encoder.md",
+      "sha256": "72debca74503150a317ef3ff381c3d3938154570c2b79bd6c9459ab4733d1f41",
+      "bytes": 6449
+    },
+    {
+      "title": "GINE candidate-size curriculum: pairs to triples to quads",
+      "local_source": "experiments/gine-candidate-curriculum.md",
+      "snapshot": "reports/gine-candidate-curriculum.md",
+      "sha256": "89e2864317d31a338a159f6e5bd4db2317c2e56f9bfc362306afb750deca1cfc",
+      "bytes": 7866
+    },
+    {
+      "title": "Closed-compound edge experiment",
+      "local_source": "experiments/gine-closed-compounds.md",
+      "snapshot": "reports/gine-closed-compounds.md",
+      "sha256": "97e3298bece44adb993bd08393cb5a38803c0536a5f7aeec81307d6d60e23fa1",
+      "bytes": 3657
+    },
+    {
+      "title": "Five-fold tuning: ordinary GINE versus edge coherence",
+      "local_source": "experiments/gine-coherence-cv/report.md",
+      "snapshot": "reports/gine-coherence-cv/report.md",
+      "sha256": "edc8f20be41055769c365c6b76b660bb878e63c48fc776dacec255d4912dd278",
+      "bytes": 5597
+    },
+    {
+      "title": "GINE state-size curriculum",
+      "local_source": "experiments/gine-curriculum.md",
+      "snapshot": "reports/gine-curriculum.md",
+      "sha256": "b2ef32379db64695d93701180fed805ea5d78e2b5034e7e91fea4c2f3ff5b4ad",
+      "bytes": 6205
+    },
+    {
+      "title": "Candidate-local edge coherence amplification",
+      "local_source": "experiments/gine-edge-coherence.md",
+      "snapshot": "reports/gine-edge-coherence.md",
+      "sha256": "44eae03500dbe6e49ea79654aa124e8797f2b2782cbacb0b04fbe27fae482a99",
+      "bytes": 6620
+    },
+    {
+      "title": "Direct edge-summary channel with regular candidate GINE",
+      "local_source": "experiments/gine-edge-summary/edge-summary-comparison.md",
+      "snapshot": "reports/gine-edge-summary/edge-summary-comparison.md",
+      "sha256": "cfb0d6623b3a6ca618d82da3508ee1f888590528b8be0c4b83b8436d481cb1dd",
+      "bytes": 10642
+    },
+    {
+      "title": "Shared concept and letter-edit witnesses",
+      "local_source": "experiments/gine-edge-summary/report.md",
+      "snapshot": "reports/gine-edge-summary/report.md",
+      "sha256": "9e63ca223fae3a1e547d4f5347f0f860ab4346f8d55ebe6daf48429b98de938f",
+      "bytes": 2096
+    },
+    {
+      "title": "One simple encoder learning-rate schedule",
+      "local_source": "experiments/gine-encoder-annealing.md",
+      "snapshot": "reports/gine-encoder-annealing.md",
+      "sha256": "099409322cf0b21ea184958403f67f46990b858dd9c81a39f2b2bbae37ade296",
+      "bytes": 3528
+    },
+    {
+      "title": "GINE probability-floor hyperparameter tuning",
+      "local_source": "experiments/gine-floor-tuning.md",
+      "snapshot": "reports/gine-floor-tuning.md",
+      "sha256": "01478a3a6cd53d0b87da86c98d4cdfb412a17ddfe0abd6ffa86737c3ab8ffafa",
+      "bytes": 9296
+    },
+    {
+      "title": "One correct group plus partial groups",
+      "local_source": "experiments/gine-fragment-states.md",
+      "snapshot": "reports/gine-fragment-states.md",
+      "sha256": "f5256c955656e7e7a696c957afe9befb890e6935424c49683604ffafba776bff",
+      "bytes": 8456
+    },
+    {
+      "title": "GINE stability across matched branch seeds",
+      "local_source": "experiments/gine-global-input.md",
+      "snapshot": "reports/gine-global-input.md",
+      "sha256": "3a9f806c30bd276e69e6d40c0acbb8f05a54372412ab4377e3c4bdc9686c289f",
+      "bytes": 4919
+    },
+    {
+      "title": "GINE gradient diagnosis",
+      "local_source": "experiments/gine-gradient-diagnosis.md",
+      "snapshot": "reports/gine-gradient-diagnosis.md",
+      "sha256": "0e7f6a3d6e115c09f99a9299a837d20190daba5b2d6a3af9e2d496ea49fe639d",
+      "bytes": 5372
+    },
+    {
+      "title": "Per-correct-group contrastive loss on GINE",
+      "local_source": "experiments/gine-group-contrastive.md",
+      "snapshot": "reports/gine-group-contrastive.md",
+      "sha256": "0545a01b0c0536bced921fb8e532848e712b9fe5cee72feaaf6cc4305a8df5cf",
+      "bytes": 5993
+    },
+    {
+      "title": "Basic GINE hyperparameter tuning and fresh-seed reruns",
+      "local_source": "experiments/gine-hyperparameter-tuning.md",
+      "snapshot": "reports/gine-hyperparameter-tuning.md",
+      "sha256": "0408c7c3d2a5b81714fce69dd4369489f0deccebc7539e30756b55d08f87f0ed",
+      "bytes": 7932
+    },
+    {
+      "title": "GINE input-stage ablation and edge coverage audit",
+      "local_source": "experiments/gine-input-and-coverage.md",
+      "snapshot": "reports/gine-input-and-coverage.md",
+      "sha256": "581065aba65d42f52442de649936b62caa5d5179ffc1f172cb601c32ad23c923",
+      "bytes": 9725
+    },
+    {
+      "title": "Purple recovery after adding letter-edit features",
+      "local_source": "experiments/gine-letter-edits-purple.md",
+      "snapshot": "reports/gine-letter-edits-purple.md",
+      "sha256": "c68f8f3cc307ed9915956b894075b9b17f5bae0d2ea884575e1f81692ea9a341",
+      "bytes": 2603
+    },
+    {
+      "title": "One-letter substitution and deletion semantics on GINE",
+      "local_source": "experiments/gine-letter-edits.md",
+      "snapshot": "reports/gine-letter-edits.md",
+      "sha256": "3d43acf4a6c891ae8681de205e0c8c49e79c403650c84679efd3f9e7a078df97",
+      "bytes": 12177
+    },
+    {
+      "title": "GINE stability across matched branch seeds",
+      "local_source": "experiments/gine-long-budget.md",
+      "snapshot": "reports/gine-long-budget.md",
+      "sha256": "36809d65716d0d9ad968a5042cc993201726814a2fce14416a58523f5516bfd4",
+      "bytes": 4964
+    },
+    {
+      "title": "One global cosine schedule with longer training",
+      "local_source": "experiments/gine-long-cosine.md",
+      "snapshot": "reports/gine-long-cosine.md",
+      "sha256": "c92607f706e8e95516d40d24814bbea9a148504cdb63869b3e213058c297c4b8",
+      "bytes": 3111
+    },
+    {
+      "title": "Extend plain scratch GINE training",
+      "local_source": "experiments/gine-long-training.md",
+      "snapshot": "reports/gine-long-training.md",
+      "sha256": "15ebc7ba895fca74e1d57cd06e26615ac7e338c03bc0a48ddb7e7075ba7003fd",
+      "bytes": 4446
+    },
+    {
+      "title": "Longer training with unfrozen input layers and residual adapter",
+      "local_source": "experiments/gine-long-unfrozen-and-adapter.md",
+      "snapshot": "reports/gine-long-unfrozen-and-adapter.md",
+      "sha256": "036553ac8b99fcb2ab0cca6ebd2294e1e44f96664997800fef14dcfe7c65ac72",
+      "bytes": 4826
+    },
+    {
+      "title": "GINE stability across matched branch seeds",
+      "local_source": "experiments/gine-nonlinear-edges.md",
+      "snapshot": "reports/gine-nonlinear-edges.md",
+      "sha256": "f2a37b58c6d5a789072142bfb23260cb903afce3a5b8b9e65c653d301e17dcd2",
+      "bytes": 4965
+    },
+    {
+      "title": "Original-only learned-edge isolation",
+      "local_source": "experiments/gine-original-only.md",
+      "snapshot": "reports/gine-original-only.md",
+      "sha256": "1f34b1a6b74512d583ab28a9ad8da5263146631051e2843a85a4852dca2b4e4e",
+      "bytes": 8097
+    },
+    {
+      "title": "Phonetic node encodings and feature fusion",
+      "local_source": "experiments/gine-phonetic-fusion.md",
+      "snapshot": "reports/gine-phonetic-fusion.md",
+      "sha256": "da040ce426c12d18505f92a414cf5f21e6eb70ee688af7f656af2053f1bc7532",
+      "bytes": 11007
+    },
+    {
+      "title": "Pronunciation edges on tuned standalone GINE",
+      "local_source": "experiments/gine-phonetics.md",
+      "snapshot": "reports/gine-phonetics.md",
+      "sha256": "977baac22a41913e52fe04dab491c1e60ae96f1e9a8c86b33406b12361638219",
+      "bytes": 10196
+    },
+    {
+      "title": "Weak probability-floor penalty on GINE",
+      "local_source": "experiments/gine-probability-floor.md",
+      "snapshot": "reports/gine-probability-floor.md",
+      "sha256": "842eaa35d452e06695d8c7ae07d66e834b5dc1f261165bc6511ebb3ba516fa37",
+      "bytes": 6906
+    },
+    {
+      "title": "GINE stability across matched branch seeds",
+      "local_source": "experiments/gine-projected-input.md",
+      "snapshot": "reports/gine-projected-input.md",
+      "sha256": "a5db7b10826d400fbf04ee50776eeee1583f82f561048cf6251ed111c4a01bf4",
+      "bytes": 4976
+    },
+    {
+      "title": "Why a trainable GINE projection underperformed",
+      "local_source": "experiments/gine-projection-diagnostic.md",
+      "snapshot": "reports/gine-projection-diagnostic.md",
+      "sha256": "c27b343a7cd146aa684aa9d4fde0638d4b714579a0c166704f65b729411a94e2",
+      "bytes": 6193
+    },
+    {
+      "title": "Shared concept and letter-edit witnesses",
+      "local_source": "experiments/gine-relation-witnesses/report.md",
+      "snapshot": "reports/gine-relation-witnesses/report.md",
+      "sha256": "3a499c319a6c4bf79e8653e17019b32069cca758a7e30c28e2c92494a7ae9f47",
+      "bytes": 8184
+    },
+    {
+      "title": "Regular versus coherence GINE with new relation features",
+      "local_source": "experiments/gine-relation-witnesses-regular/coherence-comparison.md",
+      "snapshot": "reports/gine-relation-witnesses-regular/coherence-comparison.md",
+      "sha256": "08aef9a9927ce72c054e40376c6776afda55c692c08bef2ac4154bdcc49c97cd",
+      "bytes": 10064
+    },
+    {
+      "title": "Shared concept and letter-edit witnesses",
+      "local_source": "experiments/gine-relation-witnesses-regular/report.md",
+      "snapshot": "reports/gine-relation-witnesses-regular/report.md",
+      "sha256": "2c252c8ac65ad40bc1b2874ce9167a4cd59065f06a5f0294579733598ce0dac7",
+      "bytes": 1746
+    },
+    {
+      "title": "Relative near-miss loss experiment",
+      "local_source": "experiments/gine-relative-near-miss.md",
+      "snapshot": "reports/gine-relative-near-miss.md",
+      "sha256": "ed5d8125aea74864fdd91cc1faa2651f85dbcee00bb58235654f5eeab81b7031",
+      "bytes": 3066
+    },
+    {
+      "title": "Small residual embedding adapters",
+      "local_source": "experiments/gine-small-adapters.md",
+      "snapshot": "reports/gine-small-adapters.md",
+      "sha256": "362cef373088d1c354f1d813613feb5710d504ec16c494df346314aaedbd59e7",
+      "bytes": 4636
+    },
+    {
+      "title": "Sparse candidate-local GINE",
+      "local_source": "experiments/gine-sparse.md",
+      "snapshot": "reports/gine-sparse.md",
+      "sha256": "327f1356a1d6ee26cd7f9432e7621d78949b8bd91238d2ee77d6f5191ff1ea2a",
+      "bytes": 7244
+    },
+    {
+      "title": "GINE stability across matched branch seeds",
+      "local_source": "experiments/gine-stability.md",
+      "snapshot": "reports/gine-stability.md",
+      "sha256": "820b6266305b30297c6abf7c463fbc6953d0e8610010a8b8d2a3d953a90cac63",
+      "bytes": 4794
+    },
+    {
+      "title": "Smaller learned-transformation GINE models (running)",
+      "local_source": "experiments/gine-transformation-capacity.md",
+      "snapshot": "reports/gine-transformation-capacity.md",
+      "sha256": "9ab584073eb9fbe234b7f1a1917cadbcf8aef64b9abca0d389ce4a56d1bd9193",
+      "bytes": 702
+    },
+    {
+      "title": "Learned-transformation edge hyperparameter tuning",
+      "local_source": "experiments/gine-transformation-tuning.md",
+      "snapshot": "reports/gine-transformation-tuning.md",
+      "sha256": "4f05daa0d79290d0885f7999bb11cf19a8ee23fc553be6b7c17476654d49d1ff",
+      "bytes": 12596
+    },
+    {
+      "title": "Learned transformation edges and node representations",
+      "local_source": "experiments/gine-transformations.md",
+      "snapshot": "reports/gine-transformations.md",
+      "sha256": "22ced3c5242283e3c6e0ef4927d4becfdc37d162cc4c41564e11cb3a9de9ef3d",
+      "bytes": 12345
+    },
+    {
+      "title": "Tuned GINE: fixed-checkpoint test evaluation",
+      "local_source": "experiments/gine-tuning-test.md",
+      "snapshot": "reports/gine-tuning-test.md",
+      "sha256": "2022152ead94ce45d326b69d13cb9a6a557f76f1b2c5e17b241b96a28848133e",
+      "bytes": 2705
+    },
+    {
+      "title": "Two-stage additive GINE",
+      "local_source": "experiments/gine-two-stage.md",
+      "snapshot": "reports/gine-two-stage.md",
+      "sha256": "d1bb6666e5c7d6cf3803a01bc657a289c00de57178c0f2716b44b07466df1f48",
+      "bytes": 5917
+    },
+    {
+      "title": "Train+validation refit: previous versus CV-selected regular GINE",
+      "local_source": "experiments/gine-v1-refit/report.md",
+      "snapshot": "reports/gine-v1-refit/report.md",
+      "sha256": "ee0374fbb233d9a213d0ede561f4219b6a31366286d320f17ca6a76f310397ee",
+      "bytes": 3652
+    },
+    {
+      "title": "Graph feature ablation",
+      "local_source": "experiments/graph-feature-ablation.md",
+      "snapshot": "reports/graph-feature-ablation.md",
+      "sha256": "b979d0fe59db209581603122d041d2f17a2fdfe166773c6fdf1b993b63146a8a",
+      "bytes": 31405
+    },
+    {
+      "title": "Group mechanisms and similarity evidence",
+      "local_source": "experiments/group-mechanism-audit/report.md",
+      "snapshot": "reports/group-mechanism-audit/report.md",
+      "sha256": "10dcb5734f6a28907d7a2c40366e06e3c7bbac3656244bff609547da9afafe3d",
+      "bytes": 12565
+    },
+    {
+      "title": "Feedback search beam-width comparison",
+      "local_source": "experiments/harness-beam-widths.md",
+      "snapshot": "reports/harness-beam-widths.md",
+      "sha256": "68274d88bb428a0e942d8d51e3e1e65179b5432b5fe7edd38d1b1956584e6303",
+      "bytes": 2936
+    },
+    {
+      "title": "Best validation checkpoint: held-out feedback search",
+      "local_source": "experiments/harness-best-test.md",
+      "snapshot": "reports/harness-best-test.md",
+      "sha256": "20b7e95914cb892804313ed2bd106b4d24001ede656bed798ab4eec0e9ad43ff",
+      "bytes": 3225
+    },
+    {
+      "title": "Feedback harness findings",
+      "local_source": "experiments/harness-findings.md",
+      "snapshot": "reports/harness-findings.md",
+      "sha256": "b98fec171eea3c077a56b6bba761f5da8a177e6745b262612a25a4f99453c024",
+      "bytes": 7198
+    },
+    {
+      "title": "Original-board partition quality term",
+      "local_source": "experiments/harness-full-board-quality.md",
+      "snapshot": "reports/harness-full-board-quality.md",
+      "sha256": "9516fec46a3bde70d4f45e08a6a397fefbb0d25150c21066410735227470b2a5",
+      "bytes": 3035
+    },
+    {
+      "title": "Replace path probabilities with original-board partition quality",
+      "local_source": "experiments/harness-original-board-score.md",
+      "snapshot": "reports/harness-original-board-score.md",
+      "sha256": "68e46fbfa5f92e934e7efac25e4fb6c76b8aac51774f2114707213dd28820630",
+      "bytes": 3567
+    },
+    {
+      "title": "Model-guided feedback policy comparison",
+      "local_source": "experiments/harness-policy-framings.md",
+      "snapshot": "reports/harness-policy-framings.md",
+      "sha256": "02198d193110e4583431493d23243ce1e01f126826a51cc56ebb3d045b962902",
+      "bytes": 2936
+    },
+    {
+      "title": "Weakest-group penalty and true-partition beam audit",
+      "local_source": "experiments/harness-weakest-group-and-beam-audit.md",
+      "snapshot": "reports/harness-weakest-group-and-beam-audit.md",
+      "sha256": "90489d185a43abfc96627f2e95222537727e897b966288ec6dde02eaf68494a5",
+      "bytes": 2706
+    },
+    {
+      "title": "Standalone GINE: trainable text projection",
+      "local_source": "experiments/standalone-gine-trainable-projection.md",
+      "snapshot": "reports/standalone-gine-trainable-projection.md",
+      "sha256": "a7c59cda710fe8b1753b8a22e24f1b7ab023b84431e5ffbcc789d8af68f7be51",
+      "bytes": 4275
+    },
+    {
+      "title": "Standalone candidate GINE versus frozen-attention residual GINE",
+      "local_source": "experiments/standalone-gine.md",
+      "snapshot": "reports/standalone-gine.md",
+      "sha256": "dd0c2e9ac3f3ae8322bbb8e07d33b11d5a4048ef8bf7edd924fbe030dd5ffa88",
+      "bytes": 4788
+    },
+    {
+      "title": "Wiktionary witness filtering",
+      "local_source": "experiments/wiktionary-filters/report.md",
+      "snapshot": "reports/wiktionary-filters/report.md",
+      "sha256": "5a3ad3ce0328986bcb60f82eaa49dbc345770455c739efc81bbca9be6417881f",
+      "bytes": 5416
+    },
+    {
+      "title": "Wiktionary phrase coverage",
+      "local_source": "experiments/wiktionary-phrases/report.md",
+      "snapshot": "reports/wiktionary-phrases/report.md",
+      "sha256": "69d3b7d823ef2ae6c4cb1df97da9cf25dac0ec517d5a003b3052c96af3be7add",
+      "bytes": 5000
+    }
+  ]
+}
